@@ -28,8 +28,36 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 ::-webkit-scrollbar-track { background:var(--bg); }
 ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
 
+/* AUTH PAGE */
+.auth-container { display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--bg); position:fixed; top:0; left:0; right:0; bottom:0; z-index:1000; }
+.auth-container.hidden { display:none; }
+.auth-box { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:40px; text-align:center; max-width:400px; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+.auth-box h1 { font-size:2rem; margin-bottom:12px; color:var(--accent2); }
+.auth-box p { color:var(--text2); margin-bottom:30px; font-size:.95rem; }
+.auth-loading { display:flex; align-items:center; justify-content:center; gap:8px; color:var(--text2); }
+.spinner { width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .6s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.google-btn { background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; border:none; padding:12px 24px; border-radius:8px; font-size:1rem; font-weight:600; cursor:pointer; transition:all .3s; width:100%; }
+.google-btn:hover { transform:translateY(-2px); box-shadow:0 10px 30px rgba(102,126,234,.3); }
+.google-btn:disabled { opacity:.6; cursor:not-allowed; }
+
+/* LOADING OVERLAY */
+.loading-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,17,23,.8); display:flex; align-items:center; justify-content:center; z-index:999; opacity:0; pointer-events:none; transition:opacity .3s; }
+.loading-overlay.active { opacity:1; pointer-events:all; }
+.loading-content { text-align:center; }
+.loading-content h2 { color:var(--accent2); margin-bottom:20px; }
+
+/* AUTO-SAVE INDICATOR */
+.autosave-indicator { position:fixed; bottom:20px; right:20px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px 16px; font-size:.85rem; color:var(--text2); display:none; align-items:center; gap:8px; z-index:500; }
+.autosave-indicator.active { display:flex; }
+.autosave-dot { width:8px; height:8px; border-radius:50%; background:var(--green); animation:pulse .6s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity:1; } 50% { opacity:.5; } }
+.autosave-indicator.success { color:var(--green); }
+.autosave-indicator.error { color:var(--red); background:rgba(255,107,107,.1); border-color:var(--red); }
+
 /* NAV */
-.nav { display:flex; align-items:center; gap:8px; padding:12px 20px; background:var(--surface); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100; flex-wrap:wrap; }
+.nav { display:flex; align-items:center; gap:8px; padding:12px 20px; background:var(--surface); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100; flex-wrap:wrap; justify-content:space-between; }
+.nav-left { display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1; }
 .nav-brand { font-weight:700; font-size:1.1rem; color:var(--accent2); margin-right:12px; white-space:nowrap; }
 .nav-brand span { color:var(--orange); }
 .nav-tabs { display:flex; gap:4px; flex-wrap:wrap; }
@@ -37,1099 +65,1016 @@ body { font-family:'Segoe UI',Tahoma,sans-serif; background:var(--bg); color:var
 .nav-tab:hover { color:var(--text); background:var(--surface2); }
 .nav-tab.active { color:var(--accent2); background:rgba(108,92,231,.15); }
 
+.nav-right { display:flex; align-items:center; gap:12px; }
+.user-info { display:flex; align-items:center; gap:8px; }
+.user-avatar { width:32px; height:32px; border-radius:50%; background:var(--surface2); border:1px solid var(--border); overflow:hidden; }
+.user-avatar img { width:100%; height:100%; object-fit:cover; }
+.user-name { font-size:.85rem; color:var(--text2); white-space:nowrap; }
+.logout-btn { padding:6px 12px; background:transparent; border:1px solid var(--border); border-radius:6px; color:var(--text2); cursor:pointer; font-size:.8rem; transition:all .2s; }
+.logout-btn:hover { color:var(--red); border-color:var(--red); }
+
 /* LAYOUT */
 .page { display:none; padding:20px; max-width:1200px; margin:0 auto; }
 .page.active { display:block; }
-h2 { font-size:1.3rem; margin-bottom:16px; color:var(--accent2); }
-h3 { font-size:1rem; margin-bottom:10px; color:var(--text); }
+.section { margin-bottom:24px; }
+.section-title { font-size:1.3rem; font-weight:700; margin-bottom:16px; color:var(--accent2); }
+.grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px; transition:all .2s; }
+.card:hover { border-color:var(--accent); }
+.card-title { font-size:.95rem; color:var(--text2); margin-bottom:8px; font-weight:600; }
+.card-value { font-size:1.8rem; font-weight:700; color:var(--accent2); }
+.card-stat { font-size:.8rem; color:var(--green); margin-top:8px; }
 
-/* CARDS */
-.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin-bottom:16px; }
-.card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
-
-/* FORM */
-.form-row { display:grid; gap:12px; margin-bottom:12px; }
-.form-row.cols-2 { grid-template-columns:1fr 1fr; }
-.form-row.cols-3 { grid-template-columns:1fr 1fr 1fr; }
-.form-row.cols-4 { grid-template-columns:1fr 1fr 1fr 1fr; }
-.form-row.cols-5 { grid-template-columns:1fr 1fr 1fr 1fr 1fr; }
-.form-group { display:flex; flex-direction:column; gap:4px; }
-.form-group label { font-size:.75rem; color:var(--text2); font-weight:500; text-transform:uppercase; letter-spacing:.5px; }
-input, select, textarea { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; color:var(--text); font-size:.9rem; outline:none; transition:border .2s; font-family:inherit; }
-input:focus, select:focus, textarea:focus { border-color:var(--accent); }
-textarea { resize:vertical; min-height:60px; }
-select { cursor:pointer; }
-option { background:var(--surface2); }
+/* FORMS */
+.form-group { margin-bottom:16px; }
+.form-label { display:block; font-size:.9rem; font-weight:600; color:var(--text2); margin-bottom:6px; }
+.form-input, .form-select, .form-textarea { width:100%; padding:10px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:.9rem; transition:all .2s; font-family:inherit; }
+.form-input:focus, .form-select:focus, .form-textarea:focus { outline:none; border-color:var(--accent); background:var(--surface); box-shadow:0 0 0 3px rgba(108,92,231,.1); }
+.form-textarea { resize:vertical; min-height:100px; }
 
 /* BUTTONS */
-.btn { padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:600; font-size:.85rem; border:none; transition:all .2s; display:inline-flex; align-items:center; gap:6px; }
-.btn-primary { background:var(--accent); color:white; }
-.btn-primary:hover { background:var(--accent2); color:var(--bg); }
-.btn-success { background:var(--green); color:var(--bg); }
-.btn-success:hover { background:var(--green2); }
-.btn-danger { background:var(--red); color:white; }
-.btn-danger:hover { background:#e55039; }
-.btn-sm { padding:6px 12px; font-size:.78rem; }
-.btn-outline { background:transparent; border:1px solid var(--border); color:var(--text2); }
-.btn-outline:hover { border-color:var(--accent); color:var(--accent2); }
-.btn-icon { width:32px; height:32px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; background:var(--surface2); border:1px solid var(--border); color:var(--text2); cursor:pointer; font-size:1rem; }
-.btn-icon:hover { border-color:var(--accent); color:var(--accent2); }
+.btn { padding:10px 20px; border:none; border-radius:8px; cursor:pointer; font-weight:600; font-size:.9rem; transition:all .2s; display:inline-block; }
+.btn-primary { background:linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%); color:white; }
+.btn-primary:hover { transform:translateY(-2px); box-shadow:0 10px 25px rgba(108,92,231,.3); }
+.btn-secondary { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
+.btn-secondary:hover { background:var(--border); }
+.btn-danger { background:rgba(255,107,107,.15); color:var(--red); border:1px solid var(--red); }
+.btn-danger:hover { background:rgba(255,107,107,.25); }
+.btn-block { width:100%; }
+.btn-sm { padding:6px 12px; font-size:.8rem; }
 
-/* TRADE ENTRY */
-.trade-entry { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:10px; position:relative; }
-.trade-entry .trade-num { position:absolute; top:-10px; left:16px; background:var(--accent); color:white; font-size:.7rem; font-weight:700; padding:2px 10px; border-radius:10px; }
-.trade-entry.win { border-left:3px solid var(--green); }
-.trade-entry.loss { border-left:3px solid var(--red); }
-.trade-entry.skip { border-left:3px solid var(--text2); }
-.remove-trade { position:absolute; top:8px; right:8px; }
-
-/* JOURNAL */
-.journal-section { background:rgba(108,92,231,.08); border:1px solid rgba(108,92,231,.2); border-radius:10px; padding:16px; margin-top:16px; }
+/* TABLES */
+.table-container { overflow-x:auto; }
+.table { width:100%; border-collapse:collapse; font-size:.9rem; }
+.table th { background:var(--surface2); padding:12px; text-align:left; font-weight:600; color:var(--text2); border:1px solid var(--border); }
+.table td { padding:12px; border:1px solid var(--border); }
+.table tbody tr:hover { background:var(--surface2); }
+.status-badge { display:inline-block; padding:4px 8px; border-radius:4px; font-size:.8rem; font-weight:600; }
+.status-win { background:rgba(0,206,201,.15); color:var(--green); }
+.status-loss { background:rgba(255,107,107,.15); color:var(--red); }
+.status-break { background:rgba(253,203,110,.15); color:var(--orange); }
 
 /* STATS */
-.stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px; }
-.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; text-align:center; }
-.stat-value { font-size:1.8rem; font-weight:700; line-height:1.2; }
-.stat-label { font-size:.75rem; color:var(--text2); margin-top:4px; text-transform:uppercase; letter-spacing:.5px; }
-.stat-green { color:var(--green); }
-.stat-red { color:var(--red); }
-.stat-orange { color:var(--orange); }
-.stat-blue { color:var(--blue); }
-.stat-accent { color:var(--accent2); }
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:24px; }
+.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; }
+.stat-label { font-size:.85rem; color:var(--text2); margin-bottom:8px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+.stat-value { font-size:2rem; font-weight:700; color:var(--accent2); }
+.stat-change { font-size:.85rem; margin-top:8px; }
+.stat-change.positive { color:var(--green); }
+.stat-change.negative { color:var(--red); }
 
-/* TABLE */
-.table-wrap { overflow-x:auto; }
-table { width:100%; border-collapse:collapse; font-size:.85rem; }
-th { background:var(--surface2); padding:10px 12px; text-align:left; font-weight:600; color:var(--text2); border-bottom:2px solid var(--border); white-space:nowrap; font-size:.75rem; text-transform:uppercase; letter-spacing:.5px; }
-td { padding:10px 12px; border-bottom:1px solid var(--border); white-space:nowrap; }
-tr:hover td { background:rgba(108,92,231,.05); }
-.pnl-pos { color:var(--green); font-weight:600; }
-.pnl-neg { color:var(--red); font-weight:600; }
-
-/* PORTFOLIO CONFIG */
-.config-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
-.config-section { background:var(--surface2); border-radius:10px; padding:16px; }
-
-/* CHART */
-.chart-container { position:relative; height:250px; background:var(--surface2); border-radius:10px; padding:16px; overflow:hidden; }
-.chart-bar-wrap { display:flex; align-items:flex-end; justify-content:space-around; height:200px; padding:0 10px; }
-.chart-bar-col { display:flex; flex-direction:column; align-items:center; gap:4px; flex:1; max-width:40px; }
-.chart-bar { width:100%; border-radius:4px 4px 0 0; min-height:2px; transition:height .3s; }
-.chart-bar.pos { background:linear-gradient(to top,var(--green),var(--green2)); }
-.chart-bar.neg { background:linear-gradient(to top,var(--red),var(--red2)); }
-.chart-label { font-size:.65rem; color:var(--text2); }
-.chart-val { font-size:.65rem; font-weight:600; }
-
-/* CALENDAR HEAT */
-.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
-.cal-cell { aspect-ratio:1; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:.7rem; font-weight:600; cursor:default; }
-.cal-header { font-size:.65rem; color:var(--text2); font-weight:600; }
-.cal-empty { background:transparent; }
-.cal-win { background:rgba(0,206,201,.3); color:var(--green2); }
-.cal-loss { background:rgba(255,107,107,.3); color:var(--red2); }
-.cal-even { background:rgba(253,203,110,.2); color:var(--orange); }
-.cal-nodata { background:var(--surface2); color:var(--text2); opacity:.3; }
-
-/* MONTH SELECT */
-.month-nav { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
-.month-nav select { min-width:140px; }
-
-/* BADGE */
-.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:.72rem; font-weight:600; }
-.badge-win { background:rgba(0,206,201,.15); color:var(--green); }
-.badge-loss { background:rgba(255,107,107,.15); color:var(--red); }
-.badge-skip { background:rgba(139,143,168,.15); color:var(--text2); }
+/* MODALS */
+.modal { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.5); z-index:500; align-items:center; justify-content:center; }
+.modal.active { display:flex; }
+.modal-content { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; max-width:500px; width:90%; max-height:90vh; overflow-y:auto; }
+.modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+.modal-title { font-size:1.3rem; font-weight:700; color:var(--accent2); }
+.modal-close { background:none; border:none; color:var(--text2); cursor:pointer; font-size:1.5rem; }
 
 /* RESPONSIVE */
 @media (max-width:768px) {
-  .form-row.cols-3, .form-row.cols-4, .form-row.cols-5 { grid-template-columns:1fr 1fr; }
-  .config-grid { grid-template-columns:1fr; }
-  .stats-grid { grid-template-columns:repeat(2,1fr); }
-  .nav-tabs { gap:2px; }
-  .nav-tab { padding:6px 10px; font-size:.78rem; }
-}
-@media (max-width:480px) {
-  .form-row.cols-2, .form-row.cols-3, .form-row.cols-4, .form-row.cols-5 { grid-template-columns:1fr; }
-  .stats-grid { grid-template-columns:1fr 1fr; }
-}
-
-/* TOAST */
-.toast { position:fixed; bottom:20px; right:20px; background:var(--green); color:var(--bg); padding:12px 24px; border-radius:10px; font-weight:600; font-size:.85rem; z-index:999; transform:translateY(100px); opacity:0; transition:all .3s; }
-.toast.show { transform:translateY(0); opacity:1; }
-
-/* EXPORT/IMPORT */
-.toolbar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
-
-/* ANIMATION */
-@keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-.card { animation:fadeIn .3s ease; }
-
-/* Print */
-@media print {
-  .nav, .toolbar, .btn { display:none !important; }
-  .page { display:block !important; }
-  body { background:white; color:black; }
-  .card, .stat-card { border:1px solid #ccc; background:white; }
+  .nav { flex-direction:column; gap:12px; }
+  .nav-left { width:100%; }
+  .grid { grid-template-columns:1fr; }
+  .stats-grid { grid-template-columns:1fr; }
+  .table { font-size:.8rem; }
+  .table th, .table td { padding:8px; }
 }
 </style>
 </head>
 <body>
 
+<!-- AUTH SCREEN -->
+<div class="auth-container" id="authContainer">
+  <div class="auth-box">
+    <h1>IRONMAN Trading</h1>
+    <p>Professional Trading Journal</p>
+    <button class="google-btn" id="googleSignInBtn">Sign in with Google</button>
+    <div class="auth-loading" id="authLoading" style="display:none; margin-top:20px;">
+      <div class="spinner"></div>
+      <span>Signing in...</span>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING OVERLAY -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-content">
+    <div class="spinner"></div>
+    <h2>Loading your data...</h2>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="appContainer" style="display:none;">
+
+<!-- NAV -->
 <nav class="nav">
-  <div class="nav-brand">IRONMAN <span>Trading Journal</span></div>
-  <div class="nav-tabs">
-    <button class="nav-tab active" onclick="showPage('daily')">บันทึกรายวัน</button>
-    <button class="nav-tab" onclick="showPage('portfolio')">พอร์ตเต่า</button>
-    <button class="nav-tab" onclick="showPage('tradelog')">ธุรกรรม</button>
-    <button class="nav-tab" onclick="showPage('winrate')">Win Rate</button>
-    <button class="nav-tab" onclick="showPage('dashboard')">Dashboard</button>
-    <button class="nav-tab" onclick="showPage('settings')">ตั้งค่า</button>
+  <div class="nav-left">
+    <div class="nav-brand">IRON<span>MAN</span></div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-page="daily-trades">Daily Trades</button>
+      <button class="nav-tab" data-page="portfolio">Portfolio</button>
+      <button class="nav-tab" data-page="tradelog">Trade Log</button>
+      <button class="nav-tab" data-page="winrate">Win Rate</button>
+      <button class="nav-tab" data-page="dashboard">Dashboard</button>
+      <button class="nav-tab" data-page="settings">Settings</button>
+    </div>
+  </div>
+  <div class="nav-right">
+    <div class="user-info">
+      <div class="user-avatar" id="userAvatarContainer">
+        <img id="userAvatar" src="" alt="User">
+      </div>
+      <div class="user-name" id="userName"></div>
+    </div>
+    <button class="logout-btn" id="logoutBtn">Logout</button>
   </div>
 </nav>
 
-<!-- ============ PAGE 1: DAILY TRADE ENTRY ============ -->
-<div id="page-daily" class="page active">
-  <div class="card">
-    <div class="card-header">
-      <h2>บันทึกไม้ระหว่างเทรด</h2>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <input type="date" id="tradeDate" style="width:160px;">
-        <input type="text" id="tradeLocation" placeholder="สถานที่" style="width:120px;">
-      </div>
-    </div>
-
-    <div id="tradeEntries"></div>
-
-    <div style="display:flex;gap:8px;margin-top:12px;">
-      <button class="btn btn-outline btn-sm" onclick="addTradeEntry()">+ เพิ่มไม้</button>
-    </div>
-  </div>
-
-  <!-- POST TRADE JOURNAL -->
-  <div class="card">
-    <div class="journal-section">
-      <h3 style="color:var(--accent2);margin-bottom:12px;">วัดผลสิ้นวัน (Post-Trade Journal)</h3>
-      <div class="form-row cols-3">
-        <div class="form-group">
-          <label>Winrate วันนี้</label>
-          <input type="text" id="journalWinrate" readonly style="background:var(--bg);">
-        </div>
-        <div class="form-group">
-          <label>มีไม้ไหน "ไม่เข้าเงื่อนไข" แต่ยังฝืนกดไหม</label>
-          <select id="journalForced">
-            <option value="ไม่มี">ไม่มี</option>
-            <option value="มี">มี</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>เทรดเพราะ "ระบบ" หรือ "อารมณ์"</label>
-          <select id="journalSystem">
-            <option value="ระบบ">ระบบ</option>
-            <option value="อารมณ์">อารมณ์</option>
-            <option value="ผสม">ผสม</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-row cols-3">
-        <div class="form-group">
-          <label>1 อย่างที่ทำดี</label>
-          <textarea id="journalGood" rows="2"></textarea>
-        </div>
-        <div class="form-group">
-          <label>1 อย่างที่ต้องปรับปรุง</label>
-          <textarea id="journalImprove" rows="2"></textarea>
-        </div>
-        <div class="form-group">
-          <label>คำเตือนตัวเองพรุ่งนี้</label>
-          <textarea id="journalWarning" rows="2"></textarea>
-        </div>
-      </div>
-    </div>
-    <div style="margin-top:14px;display:flex;gap:8px;">
-      <button class="btn btn-success" onclick="saveDailyRecord()">บันทึกวันนี้</button>
-    </div>
-  </div>
-
-  <!-- TODAY'S HISTORY -->
-  <div class="card" id="todayHistoryCard" style="display:none;">
-    <h3>ประวัติการเทรดวันนี้</h3>
-    <div class="table-wrap">
-      <table id="todayHistoryTable">
-        <thead><tr><th>ไม้</th><th>เวลา</th><th>ผล</th><th>คู่เงิน</th><th>อารมณ์ก่อน</th><th>เหตุผล</th><th>ชนะ/แพ้เพราะ</th><th>อารมณ์หลัง</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
+<!-- AUTO-SAVE INDICATOR -->
+<div class="autosave-indicator" id="autosaveIndicator">
+  <div class="autosave-dot"></div>
+  <span id="autosaveText">Saving...</span>
 </div>
 
-<!-- ============ PAGE 2: PORTFOLIO ============ -->
-<div id="page-portfolio" class="page">
-  <h2>พอร์ตเต่า</h2>
+<!-- PAGES -->
 
-  <div class="config-grid" style="margin-bottom:16px;">
-    <div class="config-section">
-      <h3>แผนงานรายเดือน</h3>
-      <div class="form-row cols-2">
-        <div class="form-group"><label>ทุนเริ่มต้น</label><input type="number" id="portCapital" value="16650"></div>
-        <div class="form-group"><label>ขนาดความเสี่ยง (%)</label><input type="number" id="portRisk" value="3" step="0.5"></div>
-        <div class="form-group"><label>Stop Loss (%)</label><input type="number" id="portSL" value="-30"></div>
-        <div class="form-group"><label>Take Profit (%)</label><input type="number" id="portTP" value="50"></div>
-        <div class="form-group"><label>ถ้ากำไร ถอนออก (%)</label><input type="number" id="portWithdraw" value="30"></div>
-        <div class="form-group"><label>ถ้ากำไร ทบเข้า (%)</label><input type="number" id="portReinvest" value="70"></div>
-      </div>
-      <button class="btn btn-primary btn-sm" onclick="savePortConfig()" style="margin-top:8px;">บันทึกแผน</button>
+<!-- DAILY TRADES PAGE -->
+<div class="page active" id="daily-trades">
+  <div class="section">
+    <h2 class="section-title">Daily Trades</h2>
+    <div class="form-group">
+      <label class="form-label">Entry Price</label>
+      <input type="number" class="form-input" id="entryPrice" placeholder="0.00" step="0.01">
     </div>
-    <div class="config-section">
-      <h3>แผนงานรายวัน</h3>
-      <div class="form-row cols-2">
-        <div class="form-group"><label>ความเสี่ยงต่อไม้ (%)</label><input type="number" id="portDayRisk" value="3" step="0.5"></div>
-        <div class="form-group"><label>หยุดเมื่อกำไร (%)</label><input type="number" id="portDayTP" value="5" step="0.5"></div>
-        <div class="form-group"><label>หยุดเมื่อขาดทุน (%)</label><input type="number" id="portDaySL" value="6" step="0.5"></div>
-        <div class="form-group"><label>จำนวนไม้สูงสุด</label><input type="number" id="portMaxTrades" value="5"></div>
-        <div class="form-group"><label>เวลาเทรด (นาที)</label><input type="number" id="portTimeLimit" value="35"></div>
-        <div class="form-group"><label>TP:SL Ratio</label><input type="text" id="portRR" value="0.05:0.06"></div>
-      </div>
+    <div class="form-group">
+      <label class="form-label">Quantity</label>
+      <input type="number" class="form-input" id="quantity" placeholder="0" step="1">
     </div>
-  </div>
-
-  <!-- PORT DAILY LOG -->
-  <div class="card">
-    <div class="card-header">
-      <h3>บันทึกรายวัน - พอร์ตเต่า</h3>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <select id="portMonth" onchange="renderPortfolioTable()">
-          <option value="0">มกราคม</option><option value="1">กุมภาพันธ์</option><option value="2">มีนาคม</option><option value="3">เมษายน</option>
-          <option value="4">พฤษภาคม</option><option value="5">มิถุนายน</option><option value="6">กรกฎาคม</option><option value="7">สิงหาคม</option>
-          <option value="8">กันยายน</option><option value="9">ตุลาคม</option><option value="10">พฤศจิกายน</option><option value="11">ธันวาคม</option>
-        </select>
-      </div>
+    <div class="form-group">
+      <label class="form-label">Exit Price</label>
+      <input type="number" class="form-input" id="exitPrice" placeholder="0.00" step="0.01">
     </div>
-    <div class="table-wrap">
-      <table id="portTable">
-        <thead><tr><th>วัน</th><th>เริ่มวัน</th><th>จบวัน</th><th>PNL$</th><th>PNL%</th><th>ขนาดออเดอร์</th><th>จำนวน</th><th>ชนะ</th><th>แพ้</th><th>เสมอ</th><th>Gain%</th><th>หมายเหตุ</th><th></th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <button class="btn btn-outline btn-sm" onclick="addPortDay()" style="margin-top:10px;">+ เพิ่มวัน</button>
-  </div>
-</div>
-
-<!-- ============ PAGE 3: TRADELOG (TRANSACTIONS) ============ -->
-<div id="page-tradelog" class="page">
-  <h2>บันทึกธุรกรรม</h2>
-
-  <div class="card">
-    <h3>เพิ่มรายการ</h3>
-    <div class="form-row cols-4">
-      <div class="form-group"><label>วันที่</label><input type="date" id="txDate"></div>
-      <div class="form-group"><label>ประเภท</label>
-        <select id="txType">
-          <option value="เทรด">เทรด</option>
-          <option value="ฝากเข้าพอร์ตลงทุน">ฝากเข้าพอร์ต</option>
-          <option value="ถอนออกจากพอร์ตลงทุน">ถอนออกจากพอร์ต</option>
-        </select>
-      </div>
-      <div class="form-group"><label>จำนวนเงิน ($)</label><input type="number" id="txAmount" placeholder="ขาดทุนใส่ -"></div>
-      <div class="form-group" style="justify-content:flex-end;"><button class="btn btn-success" onclick="addTransaction()">เพิ่มรายการ</button></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-header">
-      <h3>รายการทั้งหมด</h3>
-      <select id="txFilterMonth" onchange="renderTransactions()">
-        <option value="all">ทุกเดือน</option>
-        <option value="0">มกราคม</option><option value="1">กุมภาพันธ์</option><option value="2">มีนาคม</option><option value="3">เมษายน</option>
-        <option value="4">พฤษภาคม</option><option value="5">มิถุนายน</option><option value="6">กรกฎาคม</option><option value="7">สิงหาคม</option>
-        <option value="8">กันยายน</option><option value="9">ตุลาคม</option><option value="10">พฤศจิกายน</option><option value="11">ธันวาคม</option>
+    <div class="form-group">
+      <label class="form-label">Status</label>
+      <select class="form-select" id="tradeStatus">
+        <option value="WIN">WIN</option>
+        <option value="LOSS">LOSS</option>
+        <option value="BREAK">BREAK EVEN</option>
       </select>
     </div>
-    <div class="table-wrap">
-      <table id="txTable">
-        <thead><tr><th>วันที่</th><th>ประเภท</th><th>จำนวนเงิน</th><th>ยอดสะสม</th><th></th></tr></thead>
-        <tbody></tbody>
-      </table>
+    <div class="form-group">
+      <label class="form-label">Notes</label>
+      <textarea class="form-textarea" id="tradeNotes" placeholder="Add trade notes..."></textarea>
+    </div>
+    <button class="btn btn-primary btn-block" id="addTradeBtn">Add Trade</button>
+  </div>
+
+  <div class="section">
+    <h3 class="section-title">Today's Trades</h3>
+    <div id="todayTradesContainer" style="display:grid; gap:12px;">
+      <p style="color:var(--text2);">No trades yet today</p>
+    </div>
+  </div>
+</div>
+
+<!-- PORTFOLIO PAGE -->
+<div class="page" id="portfolio">
+  <div class="section">
+    <h2 class="section-title">Portfolio</h2>
+    <div class="grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Capital</div>
+        <div class="stat-value" id="totalCapital">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Current Value</div>
+        <div class="stat-value" id="currentValue">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">P&L</div>
+        <div class="stat-value" id="totalPL">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Return %</div>
+        <div class="stat-value" id="returnPercent">0.00%</div>
+      </div>
     </div>
   </div>
 
-  <!-- Monthly Report -->
-  <div class="card">
-    <h3>สรุปรายเดือน</h3>
-    <div class="table-wrap">
-      <table id="txMonthlyTable">
-        <thead><tr><th>เดือน</th><th>ผลเทรด</th><th>ฝาก</th><th>ถอน</th><th>สุทธิ</th></tr></thead>
-        <tbody></tbody>
+  <div class="section">
+    <h3 class="section-title">Manage Portfolio</h3>
+    <div class="form-group">
+      <label class="form-label">Capital Amount</label>
+      <input type="number" class="form-input" id="capitalAmount" placeholder="0.00" step="0.01">
+    </div>
+    <button class="btn btn-primary btn-block" id="updateCapitalBtn">Update Capital</button>
+  </div>
+
+  <div class="section">
+    <h3 class="section-title">Active Positions</h3>
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Shares</th>
+            <th>Entry</th>
+            <th>Current</th>
+            <th>P&L</th>
+          </tr>
+        </thead>
+        <tbody id="positionsTableBody">
+          <tr><td colspan="5" style="text-align:center; color:var(--text2);">No active positions</td></tr>
+        </tbody>
       </table>
     </div>
   </div>
 </div>
 
-<!-- ============ PAGE 4: WINRATE ============ -->
-<div id="page-winrate" class="page">
-  <h2>Win Rate</h2>
-
-  <!-- Monthly Summary -->
-  <div class="card">
-    <h3>สรุป Win Rate รายเดือน</h3>
-    <div class="table-wrap">
-      <table id="wrMonthlyTable">
-        <thead><tr><th>เดือน</th><th>ชนะ</th><th>แพ้</th><th>Win Rate</th><th>รวมไม้</th><th></th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Calendar Heat Map -->
-  <div class="card">
-    <div class="card-header">
-      <h3>ปฏิทิน Win Rate</h3>
-      <select id="wrCalMonth" onchange="renderWinrateCalendar()" style="width:140px;">
-        <option value="0">มกราคม</option><option value="1">กุมภาพันธ์</option><option value="2">มีนาคม</option><option value="3">เมษายน</option>
-        <option value="4">พฤษภาคม</option><option value="5">มิถุนายน</option><option value="6">กรกฎาคม</option><option value="7">สิงหาคม</option>
-        <option value="8">กันยายน</option><option value="9">ตุลาคม</option><option value="10">พฤศจิกายน</option><option value="11">ธันวาคม</option>
+<!-- TRADELOG PAGE -->
+<div class="page" id="tradelog">
+  <div class="section">
+    <h2 class="section-title">Trade Log</h2>
+    <div class="form-group">
+      <label class="form-label">Filter by Status</label>
+      <select class="form-select" id="filterStatus">
+        <option value="">All Trades</option>
+        <option value="WIN">Wins Only</option>
+        <option value="LOSS">Losses Only</option>
+        <option value="BREAK">Break Even</option>
       </select>
     </div>
-    <div class="cal-grid" id="wrCalendar"></div>
-    <div style="margin-top:10px;display:flex;gap:16px;font-size:.75rem;color:var(--text2);">
-      <span><span style="display:inline-block;width:12px;height:12px;background:rgba(0,206,201,.3);border-radius:3px;vertical-align:middle;"></span> ชนะ</span>
-      <span><span style="display:inline-block;width:12px;height:12px;background:rgba(255,107,107,.3);border-radius:3px;vertical-align:middle;"></span> แพ้</span>
-      <span><span style="display:inline-block;width:12px;height:12px;background:rgba(253,203,110,.2);border-radius:3px;vertical-align:middle;"></span> เสมอ</span>
-    </div>
   </div>
 
-  <!-- Daily Detail -->
-  <div class="card">
-    <h3>รายละเอียดรายวัน</h3>
-    <div class="table-wrap">
-      <table id="wrDailyTable">
-        <thead><tr><th>วันที่</th><th>ชนะ</th><th>แพ้</th><th>Win Rate</th><th>รวมไม้</th></tr></thead>
-        <tbody></tbody>
+  <div class="section">
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Entry</th>
+            <th>Exit</th>
+            <th>Qty</th>
+            <th>P&L</th>
+            <th>Status</th>
+            <th>Notes</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="tradelogTableBody">
+          <tr><td colspan="8" style="text-align:center; color:var(--text2);">No trades yet</td></tr>
+        </tbody>
       </table>
     </div>
   </div>
 </div>
 
-<!-- ============ PAGE 5: DASHBOARD ============ -->
-<div id="page-dashboard" class="page">
-  <h2>Dashboard</h2>
+<!-- WINRATE PAGE -->
+<div class="page" id="winrate">
+  <div class="section">
+    <h2 class="section-title">Win Rate Analysis</h2>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-value" id="winRatePercent">0%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Trades</div>
+        <div class="stat-value" id="totalTrades">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Wins</div>
+        <div class="stat-value" style="color:var(--green);" id="winCount">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Losses</div>
+        <div class="stat-value" style="color:var(--red);" id="lossCount">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Break Even</div>
+        <div class="stat-value" style="color:var(--orange);" id="breakCount">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Win</div>
+        <div class="stat-value" id="avgWin">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Loss</div>
+        <div class="stat-value" id="avgLoss">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Profit Factor</div>
+        <div class="stat-value" id="profitFactor">0.00</div>
+      </div>
+    </div>
+  </div>
+</div>
 
-  <div class="stats-grid" id="dashStats"></div>
-
-  <!-- PNL Chart -->
-  <div class="card">
-    <h3>ผลกำไร/ขาดทุน รายวัน (เดือนปัจจุบัน)</h3>
-    <div class="chart-container">
-      <div class="chart-bar-wrap" id="pnlChart"></div>
+<!-- DASHBOARD PAGE -->
+<div class="page" id="dashboard">
+  <div class="section">
+    <h2 class="section-title">Performance Dashboard</h2>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Today's P&L</div>
+        <div class="stat-value" id="todayPL">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Weekly P&L</div>
+        <div class="stat-value" id="weeklyPL">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Monthly P&L</div>
+        <div class="stat-value" id="monthlyPL">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total P&L</div>
+        <div class="stat-value" id="dashboardTotalPL">$0.00</div>
+      </div>
     </div>
   </div>
 
-  <!-- Equity Curve -->
-  <div class="card">
-    <h3>Equity Curve</h3>
-    <div style="position:relative;height:200px;overflow:hidden;" id="equityChart"></div>
-  </div>
-
-  <!-- Recent Trades -->
-  <div class="card">
-    <h3>เทรดล่าสุด 10 รายการ</h3>
-    <div class="table-wrap">
-      <table id="recentTradesTable">
-        <thead><tr><th>วันที่</th><th>ไม้</th><th>ผล</th><th>คู่เงิน</th><th>เหตุผล</th></tr></thead>
-        <tbody></tbody>
+  <div class="section">
+    <h3 class="section-title">Recent Trades</h3>
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Entry</th>
+            <th>Exit</th>
+            <th>P&L</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="recentTradesBody">
+          <tr><td colspan="5" style="text-align:center; color:var(--text2);">No trades yet</td></tr>
+        </tbody>
       </table>
     </div>
   </div>
 </div>
 
-<!-- ============ PAGE 6: SETTINGS ============ -->
-<div id="page-settings" class="page">
-  <h2>ตั้งค่า & จัดการข้อมูล</h2>
-
-  <div class="card">
-    <h3>สำรองข้อมูล</h3>
-    <p style="color:var(--text2);font-size:.85rem;margin-bottom:12px;">ข้อมูลทั้งหมดถูกเก็บใน Browser (LocalStorage) ของคุณ ควรสำรองข้อมูลเป็นประจำ</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="btn btn-primary" onclick="exportData()">Export ข้อมูล (JSON)</button>
-      <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">Import ข้อมูล</button>
-      <input type="file" id="importFile" accept=".json" onchange="importData(event)" style="display:none;">
-      <button class="btn btn-danger" onclick="clearAllData()">ล้างข้อมูลทั้งหมด</button>
+<!-- SETTINGS PAGE -->
+<div class="page" id="settings">
+  <div class="section">
+    <h2 class="section-title">Settings</h2>
+    <div class="form-group">
+      <label class="form-label">Default Currency</label>
+      <select class="form-select" id="defaultCurrency">
+        <option value="USD">USD ($)</option>
+        <option value="EUR">EUR (€)</option>
+        <option value="THB">THB (฿)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Decimal Places</label>
+      <input type="number" class="form-input" id="decimalPlaces" min="0" max="4" step="1" value="2">
     </div>
   </div>
 
-  <div class="card">
-    <h3>ตั้งค่าคู่เงินที่เทรด</h3>
-    <p style="color:var(--text2);font-size:.85rem;margin-bottom:12px;">เพิ่มหรือลบคู่เงินที่ใช้ประจำ</p>
-    <div style="display:flex;gap:8px;margin-bottom:12px;">
-      <input type="text" id="newPairInput" placeholder="เช่น EUR/USD" style="width:160px;">
-      <button class="btn btn-success btn-sm" onclick="addCurrencyPair()">เพิ่ม</button>
+  <div class="section">
+    <h2 class="section-title">Data Management</h2>
+    <div style="display:grid; gap:12px;">
+      <button class="btn btn-secondary btn-block" id="exportBtn">Export Data (JSON)</button>
+      <button class="btn btn-secondary btn-block" id="importBtn">Import Data (JSON)</button>
+      <input type="file" id="importFile" accept=".json" style="display:none;">
     </div>
-    <div id="pairsList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
   </div>
 
-  <div class="card">
-    <h3>สกุลเงินบัญชี</h3>
-    <select id="accountCurrency" onchange="saveSettings()" style="width:120px;">
-      <option value="$">$ (USD)</option>
-      <option value="฿">฿ (THB)</option>
-      <option value="€">€ (EUR)</option>
-    </select>
+  <div class="section">
+    <h2 class="section-title">About</h2>
+    <p style="color:var(--text2); font-size:.9rem;">
+      IRONMAN Trading Journal v2.0<br>
+      Cloud-powered with Firebase
+    </p>
   </div>
 </div>
 
-<!-- TOAST -->
-<div class="toast" id="toast"></div>
+</div>
+
+<!-- FIREBASE SCRIPTS -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <script>
-// ============ DATA STORE ============
-const STORE_KEY = 'ironman_trading_journal';
-let data = loadData();
+// ============================================
+// FIREBASE CONFIGURATION
+// ============================================
+// IMPORTANT: Replace these placeholder values with your Firebase project credentials
+// Get these values from your Firebase project settings
+const firebaseConfig = {
+  apiKey: "AIzaSyBcMoXnQXtsQD4irwF3escija8An16N6_w",
+  authDomain: "ironman-trading.firebaseapp.com",
+  projectId: "ironman-trading",
+  storageBucket: "ironman-trading.firebasestorage.app",
+  messagingSenderId: "830678315422",
+  appId: "1:830678315422:web:cfe40415172bf8d681a68f"
+};
 
-function defaultData() {
-  return {
-    settings: {
-      currency: '$',
-      pairs: ['EUR/USD','GBP/USD','AUD/USD','USD/JPY','EUR/JPY','GBP/JPY','AUD/JPY','JPY Currency Index','USD Currency Index','XAU/USD'],
-    },
-    portfolio: {
-      capital: 16650, risk: 3, sl: -30, tp: 50, withdraw: 30, reinvest: 70,
-      dayRisk: 3, dayTP: 5, daySL: 6, maxTrades: 5, timeLimit: 35, rr: '0.05:0.06',
-      days: []
-    },
-    trades: [],       // daily trade entries [{date,location,entries:[{time,num,result,pair,emotionBefore,reason,winReason,lossReason,emotionAfter}],journal:{winrate,forced,system,good,improve,warning}}]
-    transactions: [], // [{date,type,amount}]
-  };
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// ============================================
+// STATE MANAGEMENT
+// ============================================
+let currentUser = null;
+let appData = {
+  trades: [],
+  portfolio: { capital: 5000, currentValue: 5000 },
+  settings: { currency: 'USD', decimalPlaces: 2 }
+};
+
+let saveTimeout = null;
+const SAVE_DEBOUNCE_MS = 1000;
+
+// ============================================
+// FIREBASE AUTH
+// ============================================
+function setupAuthUI() {
+  const googleBtn = document.getElementById('googleSignInBtn');
+  const authLoading = document.getElementById('authLoading');
+
+  googleBtn.addEventListener('click', async () => {
+    googleBtn.disabled = true;
+    authLoading.style.display = 'flex';
+
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      const result = await auth.signInWithPopup(provider);
+      currentUser = result.user;
+      showLoadingOverlay(true);
+      await loadUserData();
+      showLoadingOverlay(false);
+      transitionToApp();
+    } catch (error) {
+      console.error('Sign-in error:', error);
+      alert('Sign-in failed: ' + error.message);
+      googleBtn.disabled = false;
+      authLoading.style.display = 'none';
+    }
+  });
 }
 
-function loadData() {
+function setupLogout() {
+  const logoutBtn = document.getElementById('logoutBtn');
+  logoutBtn.addEventListener('click', async () => {
+    try {
+      await auth.signOut();
+      transitionToAuth();
+    } catch (error) {
+      console.error('Logout error:', error);
+      alert('Logout failed: ' + error.message);
+    }
+  });
+}
+
+function transitionToApp() {
+  document.getElementById('authContainer').classList.add('hidden');
+  document.getElementById('appContainer').style.display = 'block';
+  updateUserDisplay();
+}
+
+function transitionToAuth() {
+  document.getElementById('authContainer').classList.remove('hidden');
+  document.getElementById('appContainer').style.display = 'none';
+  currentUser = null;
+}
+
+function updateUserDisplay() {
+  if (!currentUser) return;
+
+  const displayName = currentUser.displayName || 'User';
+  const photoURL = currentUser.photoURL;
+
+  document.getElementById('userName').textContent = displayName.split(' ')[0];
+
+  const avatarImg = document.getElementById('userAvatar');
+  if (photoURL) {
+    avatarImg.src = photoURL;
+    avatarImg.style.display = 'block';
+  } else {
+    avatarImg.style.display = 'none';
+  }
+}
+
+// ============================================
+// FIRESTORE DATA MANAGEMENT
+// ============================================
+async function loadUserData() {
+  if (!currentUser) return;
+
   try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (raw) {
-      const d = JSON.parse(raw);
-      if (!d.settings) d.settings = defaultData().settings;
-      if (!d.settings.pairs) d.settings.pairs = defaultData().settings.pairs;
-      if (!d.portfolio) d.portfolio = defaultData().portfolio;
-      if (!d.trades) d.trades = [];
-      if (!d.transactions) d.transactions = [];
-      return d;
+    const docRef = db.collection('users').doc(currentUser.uid);
+    const doc = await docRef.get();
+
+    if (doc.exists) {
+      // Load existing data
+      const userData = doc.data();
+      appData = {
+        trades: userData.trades || [],
+        portfolio: userData.portfolio || { capital: 5000, currentValue: 5000 },
+        settings: userData.settings || { currency: 'USD', decimalPlaces: 2 }
+      };
+    } else {
+      // Create default data for new user
+      appData = {
+        trades: [],
+        portfolio: { capital: 5000, currentValue: 5000 },
+        settings: { currency: 'USD', decimalPlaces: 2 }
+      };
+      await saveDataToFirestore();
     }
-  } catch(e) {}
-  return defaultData();
+
+    // Load UI with data
+    loadSettingsUI();
+    refreshAllPages();
+  } catch (error) {
+    console.error('Error loading user data:', error);
+    alert('Error loading your data. Please refresh the page.');
+  }
 }
 
-function saveData() {
-  localStorage.setItem(STORE_KEY, JSON.stringify(data));
+async function saveDataToFirestore() {
+  if (!currentUser) return;
+
+  try {
+    showAutosaveIndicator(true);
+
+    await db.collection('users').doc(currentUser.uid).set({
+      trades: appData.trades,
+      portfolio: appData.portfolio,
+      settings: appData.settings,
+      lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    showAutosaveIndicator(false, 'success');
+  } catch (error) {
+    console.error('Error saving to Firestore:', error);
+    showAutosaveIndicator(false, 'error');
+  }
 }
 
-// ============ NAVIGATION ============
-function showPage(id) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('page-'+id).classList.add('active');
-  event.target.classList.add('active');
-  if (id === 'dashboard') renderDashboard();
-  if (id === 'winrate') { renderWinrateMonthly(); renderWinrateCalendar(); renderWinrateDaily(); }
-  if (id === 'tradelog') { renderTransactions(); renderTxMonthly(); }
-  if (id === 'portfolio') renderPortfolioTable();
-  if (id === 'settings') renderSettings();
+function debouncedSave() {
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    saveDataToFirestore();
+  }, SAVE_DEBOUNCE_MS);
 }
 
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2000);
+// ============================================
+// AUTO-SAVE INDICATOR
+// ============================================
+function showAutosaveIndicator(show, status = 'saving') {
+  const indicator = document.getElementById('autosaveIndicator');
+  const text = document.getElementById('autosaveText');
+
+  if (show) {
+    indicator.classList.add('active');
+    indicator.classList.remove('success', 'error');
+    text.textContent = 'Saving...';
+  } else {
+    if (status === 'success') {
+      indicator.classList.add('success');
+      text.textContent = 'Saved';
+      setTimeout(() => {
+        indicator.classList.remove('active', 'success');
+      }, 2000);
+    } else if (status === 'error') {
+      indicator.classList.add('error');
+      text.textContent = 'Save failed';
+      setTimeout(() => {
+        indicator.classList.remove('active', 'error');
+      }, 3000);
+    }
+  }
 }
 
-// ============ PAGE 1: DAILY TRADES ============
-let currentEntries = [];
-
-function initDailyPage() {
-  document.getElementById('tradeDate').value = new Date().toISOString().split('T')[0];
-  currentEntries = [];
-  addTradeEntry();
-  loadExistingDay();
+// ============================================
+// LOADING OVERLAY
+// ============================================
+function showLoadingOverlay(show) {
+  const overlay = document.getElementById('loadingOverlay');
+  if (show) {
+    overlay.classList.add('active');
+  } else {
+    overlay.classList.remove('active');
+  }
 }
 
-function addTradeEntry() {
-  const num = currentEntries.length + 1;
-  currentEntries.push({time:'',num:num,result:'-',pair:'',emotionBefore:'',reason:'',winReason:'',lossReason:'',emotionAfter:''});
-  renderTradeEntries();
-}
+// ============================================
+// PAGE NAVIGATION
+// ============================================
+function setupPageNavigation() {
+  const navTabs = document.querySelectorAll('.nav-tab');
+  const pages = document.querySelectorAll('.page');
 
-function removeTradeEntry(idx) {
-  currentEntries.splice(idx, 1);
-  currentEntries.forEach((e,i) => e.num = i+1);
-  renderTradeEntries();
-}
+  navTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const pageId = tab.dataset.page;
 
-function renderTradeEntries() {
-  const wrap = document.getElementById('tradeEntries');
-  const pairs = data.settings.pairs;
-  let html = '';
-  currentEntries.forEach((e, i) => {
-    const resultClass = e.result === 'TP' ? 'win' : e.result === 'SL' ? 'loss' : 'skip';
-    html += `<div class="trade-entry ${resultClass}">
-      <div class="trade-num">ไม้ที่ ${e.num}</div>
-      <button class="btn-icon remove-trade" onclick="removeTradeEntry(${i})" title="ลบไม้นี้">&times;</button>
-      <div class="form-row cols-5" style="margin-top:8px;">
-        <div class="form-group"><label>เวลา</label><input type="time" value="${e.time}" onchange="currentEntries[${i}].time=this.value" step="60"></div>
-        <div class="form-group"><label>ผลการเทรด</label>
-          <select onchange="currentEntries[${i}].result=this.value;renderTradeEntries()">
-            <option value="-" ${e.result==='-'?'selected':''}>- (ไม่เทรด)</option>
-            <option value="TP" ${e.result==='TP'?'selected':''}>TP (ชนะ)</option>
-            <option value="SL" ${e.result==='SL'?'selected':''}>SL (แพ้)</option>
-          </select>
-        </div>
-        <div class="form-group"><label>คู่เงิน</label>
-          <select onchange="currentEntries[${i}].pair=this.value">
-            <option value="">-</option>
-            ${pairs.map(p => `<option value="${p}" ${e.pair===p?'selected':''}>${p}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group"><label>อารมณ์ก่อนเทรด</label><input type="text" value="${e.emotionBefore||''}" onchange="currentEntries[${i}].emotionBefore=this.value" placeholder="เช่น ชิวๆ ตั้งใจ"></div>
-        <div class="form-group"><label>เหตุผลการเข้า</label><input type="text" value="${e.reason||''}" onchange="currentEntries[${i}].reason=this.value" placeholder="เช่น ตามเทรนด์ที่แนวรับ"></div>
-      </div>
-      <div class="form-row cols-3">
-        <div class="form-group"><label>ชนะเพราะว่า</label><input type="text" value="${e.winReason||''}" onchange="currentEntries[${i}].winReason=this.value" placeholder="${e.result==='TP'?'ระบุเหตุผล':'-'}"></div>
-        <div class="form-group"><label>แพ้เพราะว่า</label><input type="text" value="${e.lossReason||''}" onchange="currentEntries[${i}].lossReason=this.value" placeholder="${e.result==='SL'?'ระบุเหตุผล':'-'}"></div>
-        <div class="form-group"><label>อารมณ์หลังเทรด</label><input type="text" value="${e.emotionAfter||''}" onchange="currentEntries[${i}].emotionAfter=this.value"></div>
-      </div>
-    </div>`;
+      // Update active states
+      navTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      pages.forEach(page => page.classList.remove('active'));
+      const targetPage = document.getElementById(pageId);
+      if (targetPage) {
+        targetPage.classList.add('active');
+        refreshPage(pageId);
+      }
+    });
   });
-  wrap.innerHTML = html;
-  updateJournalWinrate();
 }
 
-function updateJournalWinrate() {
-  const traded = currentEntries.filter(e => e.result !== '-');
-  const wins = traded.filter(e => e.result === 'TP').length;
-  const total = traded.length;
-  document.getElementById('journalWinrate').value = total > 0 ? (wins/total*100).toFixed(0) + '% (' + wins + '/' + total + ')' : 'ยังไม่มีไม้';
+function refreshPage(pageId) {
+  switch(pageId) {
+    case 'daily-trades':
+      renderTodayTrades();
+      break;
+    case 'portfolio':
+      renderPortfolio();
+      break;
+    case 'tradelog':
+      renderTradelog();
+      break;
+    case 'winrate':
+      renderWinrate();
+      break;
+    case 'dashboard':
+      renderDashboard();
+      break;
+  }
 }
 
-function saveDailyRecord() {
-  const date = document.getElementById('tradeDate').value;
-  const location = document.getElementById('tradeLocation').value;
-  if (!date) { toast('กรุณาเลือกวันที่'); return; }
+function refreshAllPages() {
+  renderTodayTrades();
+  renderPortfolio();
+  renderTradelog();
+  renderWinrate();
+  renderDashboard();
+}
 
-  const record = {
-    date, location,
-    entries: JSON.parse(JSON.stringify(currentEntries)),
-    journal: {
-      winrate: document.getElementById('journalWinrate').value,
-      forced: document.getElementById('journalForced').value,
-      system: document.getElementById('journalSystem').value,
-      good: document.getElementById('journalGood').value,
-      improve: document.getElementById('journalImprove').value,
-      warning: document.getElementById('journalWarning').value,
-    }
+// ============================================
+// DAILY TRADES PAGE
+// ============================================
+function setupDailyTrades() {
+  const addTradeBtn = document.getElementById('addTradeBtn');
+  addTradeBtn.addEventListener('click', addTrade);
+}
+
+function addTrade() {
+  const entry = parseFloat(document.getElementById('entryPrice').value);
+  const quantity = parseInt(document.getElementById('quantity').value);
+  const exit = parseFloat(document.getElementById('exitPrice').value);
+  const status = document.getElementById('tradeStatus').value;
+  const notes = document.getElementById('tradeNotes').value;
+
+  if (isNaN(entry) || isNaN(quantity) || isNaN(exit) || quantity === 0) {
+    alert('Please fill in all trade fields');
+    return;
+  }
+
+  const trade = {
+    id: Date.now().toString(),
+    date: new Date().toISOString().split('T')[0],
+    time: new Date().toLocaleTimeString(),
+    entry,
+    exit,
+    quantity,
+    pl: (exit - entry) * quantity,
+    status,
+    notes
   };
 
-  // Replace if same date exists
-  const idx = data.trades.findIndex(t => t.date === date);
-  if (idx >= 0) data.trades[idx] = record;
-  else data.trades.push(record);
-  data.trades.sort((a,b) => a.date.localeCompare(b.date));
+  appData.trades.unshift(trade);
 
-  // Auto-add win/loss to winrate data (calculated on the fly from trades)
-  saveData();
-  toast('บันทึกสำเร็จ!');
-  loadExistingDay();
+  // Clear form
+  document.getElementById('entryPrice').value = '';
+  document.getElementById('quantity').value = '';
+  document.getElementById('exitPrice').value = '';
+  document.getElementById('tradeNotes').value = '';
+  document.getElementById('tradeStatus').value = 'WIN';
+
+  renderTodayTrades();
+  debouncedSave();
 }
 
-function loadExistingDay() {
-  const date = document.getElementById('tradeDate').value;
-  const record = data.trades.find(t => t.date === date);
-  const card = document.getElementById('todayHistoryCard');
-  if (record && record.entries.length > 0) {
-    card.style.display = 'block';
-    const tbody = document.querySelector('#todayHistoryTable tbody');
-    tbody.innerHTML = record.entries.map(e => `<tr>
-      <td>${e.num}</td><td>${e.time||'-'}</td>
-      <td><span class="badge ${e.result==='TP'?'badge-win':e.result==='SL'?'badge-loss':'badge-skip'}">${e.result}</span></td>
-      <td>${e.pair||'-'}</td><td>${e.emotionBefore||'-'}</td><td>${e.reason||'-'}</td>
-      <td>${e.result==='TP'?(e.winReason||'-'):e.result==='SL'?(e.lossReason||'-'):'-'}</td>
-      <td>${e.emotionAfter||'-'}</td>
-    </tr>`).join('');
-  } else {
-    card.style.display = 'none';
-  }
-}
+function renderTodayTrades() {
+  const today = new Date().toISOString().split('T')[0];
+  const todayTrades = appData.trades.filter(t => t.date === today);
+  const container = document.getElementById('todayTradesContainer');
 
-document.getElementById('tradeDate').addEventListener('change', function() {
-  const record = data.trades.find(t => t.date === this.value);
-  if (record) {
-    currentEntries = JSON.parse(JSON.stringify(record.entries));
-    document.getElementById('tradeLocation').value = record.location || '';
-    if (record.journal) {
-      document.getElementById('journalForced').value = record.journal.forced || 'ไม่มี';
-      document.getElementById('journalSystem').value = record.journal.system || 'ระบบ';
-      document.getElementById('journalGood').value = record.journal.good || '';
-      document.getElementById('journalImprove').value = record.journal.improve || '';
-      document.getElementById('journalWarning').value = record.journal.warning || '';
-    }
-    renderTradeEntries();
-  } else {
-    currentEntries = [];
-    addTradeEntry();
-    document.getElementById('tradeLocation').value = '';
-    document.getElementById('journalForced').value = 'ไม่มี';
-    document.getElementById('journalSystem').value = 'ระบบ';
-    document.getElementById('journalGood').value = '';
-    document.getElementById('journalImprove').value = '';
-    document.getElementById('journalWarning').value = '';
-  }
-  loadExistingDay();
-});
-
-// ============ PAGE 2: PORTFOLIO ============
-function savePortConfig() {
-  data.portfolio.capital = +document.getElementById('portCapital').value;
-  data.portfolio.risk = +document.getElementById('portRisk').value;
-  data.portfolio.sl = +document.getElementById('portSL').value;
-  data.portfolio.tp = +document.getElementById('portTP').value;
-  data.portfolio.withdraw = +document.getElementById('portWithdraw').value;
-  data.portfolio.reinvest = +document.getElementById('portReinvest').value;
-  data.portfolio.dayRisk = +document.getElementById('portDayRisk').value;
-  data.portfolio.dayTP = +document.getElementById('portDayTP').value;
-  data.portfolio.daySL = +document.getElementById('portDaySL').value;
-  data.portfolio.maxTrades = +document.getElementById('portMaxTrades').value;
-  data.portfolio.timeLimit = +document.getElementById('portTimeLimit').value;
-  data.portfolio.rr = document.getElementById('portRR').value;
-  saveData();
-  toast('บันทึกแผนเรียบร้อย');
-}
-
-function loadPortConfig() {
-  const p = data.portfolio;
-  document.getElementById('portCapital').value = p.capital;
-  document.getElementById('portRisk').value = p.risk;
-  document.getElementById('portSL').value = p.sl;
-  document.getElementById('portTP').value = p.tp;
-  document.getElementById('portWithdraw').value = p.withdraw;
-  document.getElementById('portReinvest').value = p.reinvest;
-  document.getElementById('portDayRisk').value = p.dayRisk;
-  document.getElementById('portDayTP').value = p.dayTP;
-  document.getElementById('portDaySL').value = p.daySL;
-  document.getElementById('portMaxTrades').value = p.maxTrades;
-  document.getElementById('portTimeLimit').value = p.timeLimit;
-  document.getElementById('portRR').value = p.rr;
-}
-
-function addPortDay() {
-  const m = +document.getElementById('portMonth').value;
-  const days = data.portfolio.days.filter(d => d.month === m);
-  const dayNum = days.length + 1;
-  const lastEnd = days.length > 0 ? days[days.length-1].end : data.portfolio.capital;
-  data.portfolio.days.push({month:m, day:dayNum, start:lastEnd, end:lastEnd, pnl:0, pnlPct:0, orderSize:0, orders:0, wins:0, losses:0, draws:0, gain:0, notes:''});
-  saveData();
-  renderPortfolioTable();
-}
-
-function renderPortfolioTable() {
-  const m = +document.getElementById('portMonth').value;
-  const days = data.portfolio.days.filter(d => d.month === m);
-  const tbody = document.querySelector('#portTable tbody');
-  if (days.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:var(--text2);padding:30px;">ยังไม่มีข้อมูล กด "+ เพิ่มวัน"</td></tr>';
-    return;
-  }
-  tbody.innerHTML = days.map((d, i) => {
-    const globalIdx = data.portfolio.days.indexOf(d);
-    return `<tr>
-      <td>${d.day}</td>
-      <td><input type="number" value="${d.start}" onchange="updatePortDay(${globalIdx},'start',this.value)" style="width:80px;"></td>
-      <td><input type="number" value="${d.end}" onchange="updatePortDay(${globalIdx},'end',this.value)" style="width:80px;"></td>
-      <td class="${d.pnl>=0?'pnl-pos':'pnl-neg'}">${d.pnl>=0?'+':''}${d.pnl.toFixed(2)}</td>
-      <td class="${d.pnlPct>=0?'pnl-pos':'pnl-neg'}">${(d.pnlPct*100).toFixed(2)}%</td>
-      <td><input type="number" value="${d.orderSize}" onchange="updatePortDay(${globalIdx},'orderSize',this.value)" style="width:60px;"></td>
-      <td><input type="number" value="${d.orders}" onchange="updatePortDay(${globalIdx},'orders',this.value)" style="width:50px;"></td>
-      <td><input type="number" value="${d.wins}" onchange="updatePortDay(${globalIdx},'wins',this.value)" style="width:50px;"></td>
-      <td><input type="number" value="${d.losses}" onchange="updatePortDay(${globalIdx},'losses',this.value)" style="width:50px;"></td>
-      <td><input type="number" value="${d.draws}" onchange="updatePortDay(${globalIdx},'draws',this.value)" style="width:50px;"></td>
-      <td class="${d.gain>=0?'pnl-pos':'pnl-neg'}">${(d.gain*100).toFixed(2)}%</td>
-      <td><input type="text" value="${d.notes||''}" onchange="updatePortDay(${globalIdx},'notes',this.value)" style="width:100px;"></td>
-      <td><button class="btn-icon" onclick="removePortDay(${globalIdx})" title="ลบ">&times;</button></td>
-    </tr>`;
-  }).join('');
-}
-
-function updatePortDay(idx, field, val) {
-  const d = data.portfolio.days[idx];
-  if (['start','end','orderSize','orders','wins','losses','draws'].includes(field)) {
-    d[field] = +val;
-  } else if (field === 'notes') {
-    d[field] = val;
-  }
-  // Auto-calc
-  d.pnl = d.end - d.start;
-  d.pnlPct = d.start !== 0 ? d.pnl / d.start : 0;
-  d.gain = d.pnlPct; // cumulative can be computed on dashboard
-  saveData();
-  renderPortfolioTable();
-}
-
-function removePortDay(idx) {
-  data.portfolio.days.splice(idx, 1);
-  saveData();
-  renderPortfolioTable();
-}
-
-// ============ PAGE 3: TRANSACTIONS ============
-function addTransaction() {
-  const date = document.getElementById('txDate').value;
-  const type = document.getElementById('txType').value;
-  const amount = +document.getElementById('txAmount').value;
-  if (!date) { toast('กรุณาเลือกวันที่'); return; }
-  data.transactions.push({date, type, amount});
-  data.transactions.sort((a,b) => a.date.localeCompare(b.date));
-  saveData();
-  document.getElementById('txAmount').value = '';
-  renderTransactions();
-  renderTxMonthly();
-  toast('เพิ่มรายการแล้ว');
-}
-
-function renderTransactions() {
-  const filter = document.getElementById('txFilterMonth').value;
-  let txs = data.transactions;
-  if (filter !== 'all') {
-    txs = txs.filter(t => new Date(t.date).getMonth() === +filter);
-  }
-  let running = 0;
-  // Calc running total from all sorted
-  const allRunning = {};
-  let r = 0;
-  data.transactions.forEach(t => { r += t.amount; allRunning[t.date + t.type + t.amount] = r; });
-
-  const tbody = document.querySelector('#txTable tbody');
-  if (txs.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text2);padding:30px;">ยังไม่มีรายการ</td></tr>';
+  if (todayTrades.length === 0) {
+    container.innerHTML = '<p style="color:var(--text2);">No trades yet today</p>';
     return;
   }
 
-  let runSum = 0;
-  tbody.innerHTML = txs.map((t, i) => {
-    runSum += t.amount;
-    const globalIdx = data.transactions.indexOf(t);
-    return `<tr>
-      <td>${formatDate(t.date)}</td>
-      <td><span class="badge ${t.type==='เทรด'?(t.amount>=0?'badge-win':'badge-loss'):'badge-skip'}">${t.type}</span></td>
-      <td class="${t.amount>=0?'pnl-pos':'pnl-neg'}">${t.amount>=0?'+':''}${t.amount.toLocaleString()}</td>
-      <td>${runSum.toLocaleString()}</td>
-      <td><button class="btn-icon" onclick="removeTx(${globalIdx})" title="ลบ">&times;</button></td>
-    </tr>`;
-  }).join('');
+  const html = todayTrades.map(trade => `
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:12px;">
+        <div>
+          <div class="card-title">${trade.time}</div>
+          <span class="status-badge status-${trade.status.toLowerCase()}">${trade.status}</span>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="deleteTrade('${trade.id}')">Delete</button>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div>
+          <div style="font-size:.8rem; color:var(--text2);">Entry Price</div>
+          <div style="font-size:1.2rem; font-weight:700;">$${trade.entry.toFixed(2)}</div>
+        </div>
+        <div>
+          <div style="font-size:.8rem; color:var(--text2);">Exit Price</div>
+          <div style="font-size:1.2rem; font-weight:700;">$${trade.exit.toFixed(2)}</div>
+        </div>
+        <div>
+          <div style="font-size:.8rem; color:var(--text2);">Quantity</div>
+          <div style="font-size:1.2rem; font-weight:700;">${trade.quantity}</div>
+        </div>
+        <div>
+          <div style="font-size:.8rem; color:var(--text2);">P&L</div>
+          <div style="font-size:1.2rem; font-weight:700; color:${trade.pl >= 0 ? 'var(--green)' : 'var(--red)'};">$${trade.pl.toFixed(2)}</div>
+        </div>
+      </div>
+      ${trade.notes ? `<div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); font-size:.9rem; color:var(--text2);">${trade.notes}</div>` : ''}
+    </div>
+  `).join('');
+
+  container.innerHTML = html;
 }
 
-function removeTx(idx) {
-  data.transactions.splice(idx, 1);
-  saveData();
-  renderTransactions();
-  renderTxMonthly();
+function deleteTrade(id) {
+  appData.trades = appData.trades.filter(t => t.id !== id);
+  renderTodayTrades();
+  debouncedSave();
 }
 
-function renderTxMonthly() {
-  const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-  const tbody = document.querySelector('#txMonthlyTable tbody');
-  let html = '';
-  months.forEach((name, m) => {
-    const txs = data.transactions.filter(t => new Date(t.date).getMonth() === m);
-    if (txs.length === 0) return;
-    const trade = txs.filter(t => t.type === 'เทรด').reduce((s,t) => s+t.amount, 0);
-    const deposit = txs.filter(t => t.type.includes('ฝาก')).reduce((s,t) => s+t.amount, 0);
-    const withdraw = txs.filter(t => t.type.includes('ถอน')).reduce((s,t) => s+t.amount, 0);
-    const net = trade + deposit + withdraw;
-    html += `<tr><td>${name}</td><td class="${trade>=0?'pnl-pos':'pnl-neg'}">${trade.toLocaleString()}</td><td class="pnl-pos">${deposit>0?'+':''}${deposit.toLocaleString()}</td><td class="pnl-neg">${withdraw.toLocaleString()}</td><td class="${net>=0?'pnl-pos':'pnl-neg'}">${net>=0?'+':''}${net.toLocaleString()}</td></tr>`;
-  });
-  tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:var(--text2);">ยังไม่มีข้อมูล</td></tr>';
+// ============================================
+// PORTFOLIO PAGE
+// ============================================
+function setupPortfolio() {
+  const updateBtn = document.getElementById('updateCapitalBtn');
+  updateBtn.addEventListener('click', updateCapital);
 }
 
-// ============ PAGE 4: WIN RATE ============
-function getWinLossFromTrades() {
-  // Derive win/loss per day from trade entries
-  const result = {};
-  data.trades.forEach(t => {
-    const traded = t.entries.filter(e => e.result !== '-');
-    const wins = traded.filter(e => e.result === 'TP').length;
-    const losses = traded.filter(e => e.result === 'SL').length;
-    result[t.date] = {wins, losses, total: wins+losses};
-  });
-  return result;
+function updateCapital() {
+  const capital = parseFloat(document.getElementById('capitalAmount').value);
+
+  if (isNaN(capital) || capital < 0) {
+    alert('Please enter a valid capital amount');
+    return;
+  }
+
+  appData.portfolio.capital = capital;
+  appData.portfolio.currentValue = capital;
+  document.getElementById('capitalAmount').value = '';
+
+  renderPortfolio();
+  debouncedSave();
 }
 
-function renderWinrateMonthly() {
-  const wl = getWinLossFromTrades();
-  const months = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-  const tbody = document.querySelector('#wrMonthlyTable tbody');
-  let totalW=0, totalL=0;
-  let html = '';
-  months.forEach((name, m) => {
-    let w=0, l=0;
-    Object.entries(wl).forEach(([date, v]) => {
-      if (new Date(date).getMonth() === m) { w += v.wins; l += v.losses; }
-    });
-    totalW += w; totalL += l;
-    const total = w+l;
-    const wr = total > 0 ? (w/total*100).toFixed(1)+'%' : '-';
-    if (total > 0) {
-      const barW = total>0?w/total*100:0;
-      html += `<tr><td>${name}</td><td class="pnl-pos">${w}</td><td class="pnl-neg">${l}</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:80px;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;"><div style="width:${barW}%;height:100%;background:var(--green);border-radius:4px;"></div></div><span>${wr}</span></div></td><td>${total}</td><td></td></tr>`;
-    }
-  });
-  const totalAll = totalW+totalL;
-  const totalWr = totalAll > 0 ? (totalW/totalAll*100).toFixed(1)+'%' : '-';
-  html += `<tr style="font-weight:700;border-top:2px solid var(--accent);"><td>รวมทั้งหมด</td><td class="pnl-pos">${totalW}</td><td class="pnl-neg">${totalL}</td><td>${totalWr}</td><td>${totalAll}</td><td></td></tr>`;
+function renderPortfolio() {
+  const portfolio = appData.portfolio;
+  const pl = portfolio.currentValue - portfolio.capital;
+  const returnPercent = portfolio.capital !== 0 ? ((pl / portfolio.capital) * 100).toFixed(2) : 0;
+
+  document.getElementById('totalCapital').textContent = '$' + portfolio.capital.toFixed(2);
+  document.getElementById('currentValue').textContent = '$' + portfolio.currentValue.toFixed(2);
+  document.getElementById('totalPL').textContent = '$' + pl.toFixed(2);
+  document.getElementById('returnPercent').textContent = returnPercent + '%';
+
+  // Simple positions table (placeholder)
+  const positionsTable = document.getElementById('positionsTableBody');
+  positionsTable.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text2);">No active positions</td></tr>';
+}
+
+// ============================================
+// TRADELOG PAGE
+// ============================================
+function setupTradelog() {
+  const filterSelect = document.getElementById('filterStatus');
+  filterSelect.addEventListener('change', renderTradelog);
+}
+
+function renderTradelog() {
+  const filterStatus = document.getElementById('filterStatus').value;
+  let trades = appData.trades;
+
+  if (filterStatus) {
+    trades = trades.filter(t => t.status === filterStatus);
+  }
+
+  const tbody = document.getElementById('tradelogTableBody');
+
+  if (trades.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text2);">No trades found</td></tr>';
+    return;
+  }
+
+  const html = trades.map(trade => `
+    <tr>
+      <td>${trade.date}</td>
+      <td>$${trade.entry.toFixed(2)}</td>
+      <td>$${trade.exit.toFixed(2)}</td>
+      <td>${trade.quantity}</td>
+      <td style="color:${trade.pl >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight:700;">$${trade.pl.toFixed(2)}</td>
+      <td><span class="status-badge status-${trade.status.toLowerCase()}">${trade.status}</span></td>
+      <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${trade.notes || '-'}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteTrade('${trade.id}')">Delete</button></td>
+    </tr>
+  `).join('');
+
   tbody.innerHTML = html;
 }
 
-function renderWinrateCalendar() {
-  const m = +document.getElementById('wrCalMonth').value;
-  const year = 2026; // BE 2569
-  const wl = getWinLossFromTrades();
-  const cal = document.getElementById('wrCalendar');
-  const daysInMonth = new Date(year, m+1, 0).getDate();
-  const firstDay = new Date(year, m, 1).getDay(); // 0=Sun
+// ============================================
+// WINRATE PAGE
+// ============================================
+function renderWinrate() {
+  const trades = appData.trades;
 
-  const headers = ['อา','จ','อ','พ','พฤ','ศ','ส'];
-  let html = headers.map(h => `<div class="cal-cell cal-header">${h}</div>`).join('');
-  for (let i=0; i<firstDay; i++) html += '<div class="cal-cell cal-empty"></div>';
-  for (let d=1; d<=daysInMonth; d++) {
-    const dateStr = `${year}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const dayData = wl[dateStr];
-    let cls = 'cal-nodata';
-    if (dayData && dayData.total > 0) {
-      const wr = dayData.wins / dayData.total;
-      if (wr > 0.5) cls = 'cal-win';
-      else if (wr < 0.5) cls = 'cal-loss';
-      else cls = 'cal-even';
-    }
-    html += `<div class="cal-cell ${cls}" title="${dateStr}: ${dayData?dayData.wins+'W '+dayData.losses+'L':'ไม่มีข้อมูล'}">${d}</div>`;
+  if (trades.length === 0) {
+    document.getElementById('winRatePercent').textContent = '0%';
+    document.getElementById('totalTrades').textContent = '0';
+    document.getElementById('winCount').textContent = '0';
+    document.getElementById('lossCount').textContent = '0';
+    document.getElementById('breakCount').textContent = '0';
+    document.getElementById('avgWin').textContent = '$0.00';
+    document.getElementById('avgLoss').textContent = '$0.00';
+    document.getElementById('profitFactor').textContent = '0.00';
+    return;
   }
-  cal.innerHTML = html;
+
+  const wins = trades.filter(t => t.status === 'WIN');
+  const losses = trades.filter(t => t.status === 'LOSS');
+  const breaks = trades.filter(t => t.status === 'BREAK');
+
+  const winRate = ((wins.length / trades.length) * 100).toFixed(2);
+  const totalWinsPL = wins.reduce((sum, t) => sum + t.pl, 0);
+  const totalLossesPL = losses.reduce((sum, t) => sum + Math.abs(t.pl), 0);
+  const avgWin = wins.length > 0 ? (totalWinsPL / wins.length).toFixed(2) : 0;
+  const avgLoss = losses.length > 0 ? (totalLossesPL / losses.length).toFixed(2) : 0;
+  const profitFactor = totalLossesPL !== 0 ? (totalWinsPL / totalLossesPL).toFixed(2) : 0;
+
+  document.getElementById('winRatePercent').textContent = winRate + '%';
+  document.getElementById('totalTrades').textContent = trades.length;
+  document.getElementById('winCount').textContent = wins.length;
+  document.getElementById('lossCount').textContent = losses.length;
+  document.getElementById('breakCount').textContent = breaks.length;
+  document.getElementById('avgWin').textContent = '$' + avgWin;
+  document.getElementById('avgLoss').textContent = '$' + avgLoss;
+  document.getElementById('profitFactor').textContent = profitFactor;
 }
 
-function renderWinrateDaily() {
-  const m = +document.getElementById('wrCalMonth').value;
-  const wl = getWinLossFromTrades();
-  const tbody = document.querySelector('#wrDailyTable tbody');
-  let html = '';
-  const entries = Object.entries(wl).filter(([date]) => new Date(date).getMonth() === m).sort((a,b) => a[0].localeCompare(b[0]));
-  entries.forEach(([date, v]) => {
-    if (v.total === 0) return;
-    const wr = (v.wins/v.total*100).toFixed(1);
-    html += `<tr><td>${formatDate(date)}</td><td class="pnl-pos">${v.wins}</td><td class="pnl-neg">${v.losses}</td><td>${wr}%</td><td>${v.total}</td></tr>`;
-  });
-  tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:var(--text2);">ยังไม่มีข้อมูลเดือนนี้</td></tr>';
-}
-
-document.getElementById('wrCalMonth').addEventListener('change', () => { renderWinrateDaily(); });
-
-// ============ PAGE 5: DASHBOARD ============
+// ============================================
+// DASHBOARD PAGE
+// ============================================
 function renderDashboard() {
-  const wl = getWinLossFromTrades();
-  let totalWins=0, totalLosses=0, totalTrades=0;
-  Object.values(wl).forEach(v => { totalWins+=v.wins; totalLosses+=v.losses; totalTrades+=v.total; });
-  const winrate = totalTrades>0?(totalWins/totalTrades*100).toFixed(1):0;
-  const tradeDays = data.trades.length;
+  const trades = appData.trades;
+  const today = new Date().toISOString().split('T')[0];
+  const weekAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0];
+  const monthAgo = new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0];
 
-  // PNL from transactions
-  const tradeTxs = data.transactions.filter(t => t.type === 'เทรด');
-  const totalPnl = tradeTxs.reduce((s,t) => s+t.amount, 0);
-  const deposits = data.transactions.filter(t => t.type.includes('ฝาก')).reduce((s,t) => s+t.amount, 0);
-  const currentBal = data.transactions.reduce((s,t) => s+t.amount, 0);
+  const todayTrades = trades.filter(t => t.date === today);
+  const weekTrades = trades.filter(t => t.date >= weekAgo);
+  const monthTrades = trades.filter(t => t.date >= monthAgo);
+  const allTrades = trades;
 
-  // Best/worst day
-  const dailyPnl = {};
-  tradeTxs.forEach(t => { dailyPnl[t.date] = (dailyPnl[t.date]||0) + t.amount; });
-  const pnlValues = Object.values(dailyPnl);
-  const bestDay = pnlValues.length > 0 ? Math.max(...pnlValues) : 0;
-  const worstDay = pnlValues.length > 0 ? Math.min(...pnlValues) : 0;
+  const todayPL = todayTrades.reduce((sum, t) => sum + t.pl, 0);
+  const weekPL = weekTrades.reduce((sum, t) => sum + t.pl, 0);
+  const monthPL = monthTrades.reduce((sum, t) => sum + t.pl, 0);
+  const totalPL = allTrades.reduce((sum, t) => sum + t.pl, 0);
 
-  // Streak
-  let currentStreak = 0;
-  const sortedDates = Object.keys(dailyPnl).sort();
-  for (let i = sortedDates.length-1; i>=0; i--) {
-    if (dailyPnl[sortedDates[i]] > 0) currentStreak++;
-    else break;
+  document.getElementById('todayPL').textContent = '$' + todayPL.toFixed(2);
+  document.getElementById('weeklyPL').textContent = '$' + weekPL.toFixed(2);
+  document.getElementById('monthlyPL').textContent = '$' + monthPL.toFixed(2);
+  document.getElementById('dashboardTotalPL').textContent = '$' + totalPL.toFixed(2);
+
+  // Recent trades
+  const recentTrades = trades.slice(0, 10);
+  const tbody = document.getElementById('recentTradesBody');
+
+  if (recentTrades.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text2);">No trades yet</td></tr>';
+    return;
   }
 
-  const cur = data.settings.currency;
-  document.getElementById('dashStats').innerHTML = `
-    <div class="stat-card"><div class="stat-value stat-accent">${winrate}%</div><div class="stat-label">Win Rate</div></div>
-    <div class="stat-card"><div class="stat-value ${totalPnl>=0?'stat-green':'stat-red'}">${totalPnl>=0?'+':''}${totalPnl.toLocaleString()}${cur}</div><div class="stat-label">ผลกำไร/ขาดทุน</div></div>
-    <div class="stat-card"><div class="stat-value stat-blue">${totalTrades}</div><div class="stat-label">รวมไม้ทั้งหมด</div></div>
-    <div class="stat-card"><div class="stat-value stat-orange">${tradeDays}</div><div class="stat-label">วันที่เทรด</div></div>
-    <div class="stat-card"><div class="stat-value stat-green">+${bestDay.toLocaleString()}${cur}</div><div class="stat-label">วันที่ดีที่สุด</div></div>
-    <div class="stat-card"><div class="stat-value stat-red">${worstDay.toLocaleString()}${cur}</div><div class="stat-label">วันที่แย่ที่สุด</div></div>
-    <div class="stat-card"><div class="stat-value stat-accent">${currentBal.toLocaleString()}${cur}</div><div class="stat-label">ยอดปัจจุบัน</div></div>
-    <div class="stat-card"><div class="stat-value stat-green">${currentStreak}</div><div class="stat-label">วันชนะติดต่อกัน</div></div>
-  `;
+  const html = recentTrades.map(trade => `
+    <tr>
+      <td>${trade.date} ${trade.time}</td>
+      <td>$${trade.entry.toFixed(2)}</td>
+      <td>$${trade.exit.toFixed(2)}</td>
+      <td style="color:${trade.pl >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight:700;">$${trade.pl.toFixed(2)}</td>
+      <td><span class="status-badge status-${trade.status.toLowerCase()}">${trade.status}</span></td>
+    </tr>
+  `).join('');
 
-  // PNL Bar Chart - current month
-  const now = new Date();
-  const curMonth = now.getMonth();
-  const monthPnl = {};
-  tradeTxs.filter(t => new Date(t.date).getMonth() === curMonth).forEach(t => {
-    const d = new Date(t.date).getDate();
-    monthPnl[d] = (monthPnl[d]||0) + t.amount;
+  tbody.innerHTML = html;
+}
+
+// ============================================
+// SETTINGS PAGE
+// ============================================
+function setupSettings() {
+  const currencySelect = document.getElementById('defaultCurrency');
+  const decimalInput = document.getElementById('decimalPlaces');
+  const exportBtn = document.getElementById('exportBtn');
+  const importBtn = document.getElementById('importBtn');
+  const importFile = document.getElementById('importFile');
+
+  currencySelect.addEventListener('change', (e) => {
+    appData.settings.currency = e.target.value;
+    debouncedSave();
   });
 
-  const chartWrap = document.getElementById('pnlChart');
-  const vals = Object.values(monthPnl);
-  const maxAbs = Math.max(1, ...vals.map(Math.abs));
-  if (vals.length === 0) {
-    chartWrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text2);">ยังไม่มีข้อมูลเดือนนี้</div>';
-  } else {
-    chartWrap.innerHTML = Object.entries(monthPnl).map(([d, v]) => {
-      const h = Math.abs(v)/maxAbs * 160;
-      return `<div class="chart-bar-col"><div class="chart-val ${v>=0?'pnl-pos':'pnl-neg'}">${v>=0?'+':''}${v}</div><div class="chart-bar ${v>=0?'pos':'neg'}" style="height:${h}px;"></div><div class="chart-label">${d}</div></div>`;
-    }).join('');
-  }
-
-  // Equity Curve (SVG)
-  const eqChart = document.getElementById('equityChart');
-  let equity = [];
-  let cum = 0;
-  const sortedTxDates = [...new Set(tradeTxs.map(t => t.date))].sort();
-  sortedTxDates.forEach(date => {
-    const dayTotal = tradeTxs.filter(t => t.date === date).reduce((s,t) => s+t.amount, 0);
-    cum += dayTotal;
-    equity.push(cum);
+  decimalInput.addEventListener('change', (e) => {
+    appData.settings.decimalPlaces = parseInt(e.target.value);
+    debouncedSave();
   });
 
-  if (equity.length < 2) {
-    eqChart.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text2);">ต้องมีข้อมูลอย่างน้อย 2 วัน</div>';
-  } else {
-    const w = 1160, h = 180, pad = 10;
-    const minE = Math.min(...equity), maxE = Math.max(...equity);
-    const rangeE = maxE - minE || 1;
-    const points = equity.map((v, i) => {
-      const x = pad + (i / (equity.length-1)) * (w - 2*pad);
-      const y = h - pad - ((v - minE) / rangeE) * (h - 2*pad);
-      return `${x},${y}`;
-    });
-    const areaPoints = points.join(' ') + ` ${w-pad},${h-pad} ${pad},${h-pad}`;
-    eqChart.innerHTML = `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:100%;">
-      <defs><linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--green)" stop-opacity="0.3"/><stop offset="100%" stop-color="var(--green)" stop-opacity="0"/></linearGradient></defs>
-      <polygon points="${areaPoints}" fill="url(#eqGrad)"/>
-      <polyline points="${points.join(' ')}" fill="none" stroke="var(--green)" stroke-width="2"/>
-    </svg>`;
-  }
-
-  // Recent Trades
-  const recent = [];
-  [...data.trades].reverse().slice(0,5).forEach(t => {
-    t.entries.filter(e => e.result !== '-').forEach(e => {
-      if (recent.length < 10) recent.push({date: t.date, ...e});
-    });
-  });
-  document.querySelector('#recentTradesTable tbody').innerHTML = recent.map(e => `<tr>
-    <td>${formatDate(e.date)}</td><td>${e.num}</td>
-    <td><span class="badge ${e.result==='TP'?'badge-win':'badge-loss'}">${e.result}</span></td>
-    <td>${e.pair||'-'}</td><td>${e.reason||'-'}</td>
-  </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text2);">ยังไม่มีข้อมูล</td></tr>';
+  exportBtn.addEventListener('click', exportData);
+  importBtn.addEventListener('click', () => importFile.click());
+  importFile.addEventListener('change', handleImport);
 }
 
-// ============ PAGE 6: SETTINGS ============
-function renderSettings() {
-  document.getElementById('accountCurrency').value = data.settings.currency;
-  renderPairsList();
+function loadSettingsUI() {
+  document.getElementById('defaultCurrency').value = appData.settings.currency;
+  document.getElementById('decimalPlaces').value = appData.settings.decimalPlaces;
 }
 
-function renderPairsList() {
-  const wrap = document.getElementById('pairsList');
-  wrap.innerHTML = data.settings.pairs.map((p, i) => `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--surface2);padding:4px 10px;border-radius:20px;font-size:.82rem;">${p}<button class="btn-icon" style="width:20px;height:20px;font-size:.7rem;" onclick="removePair(${i})">&times;</button></span>`).join('');
-}
-
-function addCurrencyPair() {
-  const v = document.getElementById('newPairInput').value.trim();
-  if (v && !data.settings.pairs.includes(v)) {
-    data.settings.pairs.push(v);
-    saveData();
-    renderPairsList();
-    document.getElementById('newPairInput').value = '';
-    toast('เพิ่มคู่เงิน ' + v);
-  }
-}
-
-function removePair(idx) {
-  data.settings.pairs.splice(idx, 1);
-  saveData();
-  renderPairsList();
-}
-
-function saveSettings() {
-  data.settings.currency = document.getElementById('accountCurrency').value;
-  saveData();
-}
-
-// ============ EXPORT / IMPORT ============
 function exportData() {
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `ironman_trading_${new Date().toISOString().split('T')[0]}.json`;
-  a.click();
+  const dataStr = JSON.stringify(appData, null, 2);
+  const dataBlob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(dataBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `ironman-trades-${new Date().toISOString().split('T')[0]}.json`;
+  link.click();
   URL.revokeObjectURL(url);
-  toast('Export สำเร็จ');
 }
 
-function importData(event) {
-  const file = event.target.files[0];
+function handleImport(e) {
+  const file = e.target.files[0];
   if (!file) return;
+
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = async (event) => {
     try {
-      const imported = JSON.parse(e.target.result);
-      if (imported.trades || imported.transactions || imported.portfolio) {
-        data = imported;
-        if (!data.settings) data.settings = defaultData().settings;
-        if (!data.settings.pairs) data.settings.pairs = defaultData().settings.pairs;
-        if (!data.portfolio) data.portfolio = defaultData().portfolio;
-        if (!data.trades) data.trades = [];
-        if (!data.transactions) data.transactions = [];
-        saveData();
-        toast('Import สำเร็จ!');
-        location.reload();
-      } else {
-        toast('ไฟล์ไม่ถูกต้อง');
+      const imported = JSON.parse(event.target.result);
+
+      // Validate structure
+      if (!imported.trades || !imported.portfolio || !imported.settings) {
+        alert('Invalid data format');
+        return;
       }
-    } catch(err) {
-      toast('อ่านไฟล์ไม่ได้');
+
+      appData = imported;
+      loadSettingsUI();
+      refreshAllPages();
+      await saveDataToFirestore();
+      alert('Data imported successfully');
+      document.getElementById('importFile').value = '';
+    } catch (error) {
+      alert('Error importing data: ' + error.message);
     }
   };
   reader.readAsText(file);
 }
 
-function clearAllData() {
-  if (confirm('คุณแน่ใจว่าต้องการลบข้อมูลทั้งหมด? การกระทำนี้ไม่สามารถเรียกคืนได้!')) {
-    if (confirm('ยืนยันอีกครั้ง: ลบข้อมูลทั้งหมด?')) {
-      localStorage.removeItem(STORE_KEY);
-      data = defaultData();
-      saveData();
-      toast('ลบข้อมูลทั้งหมดแล้ว');
-      location.reload();
-    }
+// ============================================
+// AUTH STATE LISTENER
+// ============================================
+auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    currentUser = user;
+    showLoadingOverlay(true);
+    await loadUserData();
+    showLoadingOverlay(false);
+    transitionToApp();
+  } else {
+    transitionToAuth();
   }
-}
+});
 
-// ============ UTILS ============
-function formatDate(dateStr) {
-  const d = new Date(dateStr);
-  return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()+543}`;
-}
-
-// ============ INIT ============
-initDailyPage();
-loadPortConfig();
-document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
-
-// Set current month for selectors
-const curMonth = new Date().getMonth();
-document.getElementById('portMonth').value = curMonth;
-document.getElementById('wrCalMonth').value = curMonth;
+// ============================================
+// INITIALIZATION
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
+  setupAuthUI();
+  setupLogout();
+  setupPageNavigation();
+  setupDailyTrades();
+  setupPortfolio();
+  setupTradelog();
+  setupSettings();
+});
 </script>
+
 </body>
 </html>
