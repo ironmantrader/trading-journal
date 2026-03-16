@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>IRONMAN Trading Journal 2569</title>
+<title>IRONMAN Trading Journal</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -78,7 +78,7 @@ h3 { font-size:1rem; margin-bottom:10px; color:var(--text); }
 .form-group label { font-size:.75rem; color:var(--text2); font-weight:500; text-transform:uppercase; letter-spacing:.5px; }
 input, select, textarea { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; color:var(--text); font-size:.9rem; outline:none; transition:border .2s; font-family:inherit; }
 input:focus, select:focus, textarea:focus { border-color:var(--accent); }
-textarea { resize:vertical; min-height:60px; }
+textarea { resize:vertical; min-height:60px; white-space:pre-wrap; line-height:1.5; }
 select { cursor:pointer; }
 option { background:var(--surface2); }
 .btn { padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:600; font-size:.85rem; border:none; transition:all .2s; display:inline-flex; align-items:center; gap:6px; }
@@ -171,6 +171,7 @@ tr:hover td { background:rgba(108,92,231,.05); }
     <button class="nav-tab" onclick="showPage('diary',this)">Diary</button>
     <button class="nav-tab" onclick="showPage('settings',this)">ตั้งค่า</button>
   </div>
+  <select id="yearSelect" onchange="switchYear(this.value)" style="margin-left:8px;background:var(--surface2);border:1px solid var(--accent);border-radius:8px;padding:6px 12px;color:var(--accent2);font-weight:700;font-size:.85rem;cursor:pointer;"></select>
   <div class="nav-user"><img id="userPhoto" src=""><span id="userName"></span><button class="logout-btn" onclick="logoutUser()">Logout</button></div>
 </nav>
 
@@ -189,9 +190,9 @@ tr:hover td { background:rgba(108,92,231,.05); }
         <div class="form-group"><label>เทรดเพราะ "ระบบ" หรือ "อารมณ์"</label><select id="journalSystem"><option value="ระบบ">ระบบ</option><option value="อารมณ์">อารมณ์</option><option value="ผสม">ผสม</option></select></div>
       </div>
       <div class="form-row cols-3">
-        <div class="form-group"><label>1 อย่างที่ทำดี</label><textarea id="journalGood" rows="2"></textarea></div>
-        <div class="form-group"><label>1 อย่างที่ต้องปรับปรุง</label><textarea id="journalImprove" rows="2"></textarea></div>
-        <div class="form-group"><label>คำเตือนตัวเองพรุ่งนี้</label><textarea id="journalWarning" rows="2"></textarea></div>
+        <div class="form-group"><label>1 อย่างที่ทำดี</label><textarea id="journalGood" rows="3"></textarea></div>
+        <div class="form-group"><label>1 อย่างที่ต้องปรับปรุง</label><textarea id="journalImprove" rows="3"></textarea></div>
+        <div class="form-group"><label>คำเตือนตัวเองพรุ่งนี้</label><textarea id="journalWarning" rows="3"></textarea></div>
       </div>
     </div>
     <div style="margin-top:14px;"><button class="btn btn-success" onclick="saveDailyRecord()">บันทึกวันนี้</button></div>
@@ -238,7 +239,7 @@ tr:hover td { background:rgba(108,92,231,.05); }
       <div class="form-group"><label>วันที่</label><input type="date" id="diaryDate"></div>
       <div class="form-group" style="justify-content:flex-end;align-items:flex-end;"><button class="btn btn-success" onclick="saveDiaryEntry()">บันทึก Diary</button></div>
     </div>
-    <div class="form-group"><label>บันทึกความรู้สึก / สิ่งที่เรียนรู้ / เตือนตัวเอง</label><textarea id="diaryText" rows="4" placeholder="เช่น รอกราฟได้ ถือว่าทำได้ดี เพราะกราฟไม่ใช่ กราฟเสี่ยง เราก็ไม่เทรด..."></textarea></div>
+    <div class="form-group"><label>บันทึกความรู้สึก / สิ่งที่เรียนรู้ / เตือนตัวเอง (พิมพ์ยาวๆ ได้เลย กด Enter ขึ้นบรรทัดใหม่)</label><textarea id="diaryText" rows="8" placeholder="เช่น&#10;- รอกราฟได้ ถือว่าทำได้ดี&#10;- กราฟไม่ใช่ กราฟเสี่ยง เราก็ไม่เทรด&#10;- วันนี้อารมณ์ดี เข้าตามระบบทุกไม้&#10;&#10;เขียนได้ยาวเท่าที่ต้องการ..."></textarea></div>
   </div>
   <div class="card">
     <div class="card-header"><h3>ประวัติ Diary</h3><select id="diaryMonth" onchange="renderDiary()"><option value="all">ทุกเดือน</option><option value="0">มกราคม</option><option value="1">กุมภาพันธ์</option><option value="2">มีนาคม</option><option value="3">เมษายน</option><option value="4">พฤษภาคม</option><option value="5">มิถุนายน</option><option value="6">กรกฎาคม</option><option value="7">สิงหาคม</option><option value="8">กันยายน</option><option value="9">ตุลาคม</option><option value="10">พฤศจิกายน</option><option value="11">ธันวาคม</option></select></div>
@@ -251,7 +252,18 @@ tr:hover td { background:rgba(108,92,231,.05); }
   <div class="card"><h3>สำรองข้อมูล</h3><p style="color:var(--text2);font-size:.85rem;margin-bottom:12px;">ข้อมูลเก็บบน Firebase Cloud อัตโนมัติ แต่ควร Export สำรองไว้เป็นประจำ</p><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-primary" onclick="exportData()">Export ข้อมูล (JSON)</button><button class="btn btn-outline" onclick="document.getElementById('importFile').click()">Import ข้อมูล</button><input type="file" id="importFile" accept=".json" onchange="importData(event)" style="display:none;"></div></div>
   <div class="card"><h3>ตั้งค่าคู่เงินที่เทรด</h3><div style="display:flex;gap:8px;margin-bottom:12px;"><input type="text" id="newPairInput" placeholder="เช่น EUR/USD" style="width:160px;"><button class="btn btn-success btn-sm" onclick="addCurrencyPair()">เพิ่ม</button></div><div id="pairsList" style="display:flex;flex-wrap:wrap;gap:6px;"></div></div>
   <div class="card"><h3>สกุลเงินบัญชี</h3><select id="accountCurrency" onchange="saveSettings()" style="width:120px;"><option value="$">$ (USD)</option><option value="฿">฿ (THB)</option><option value="€">€ (EUR)</option></select></div>
-  <div class="card"><p style="color:var(--text2);font-size:.8rem;">IRONMAN Trading Journal v2.1 — Cloud-powered with Firebase + Trader Diary</p></div>
+  <div class="card"><p style="color:var(--text2);font-size:.8rem;">IRONMAN Trading Journal v3.0 — Cloud-powered with Firebase + Yearly Data Storage</p></div>
+  <div class="card" style="border-color:var(--accent);"><h3 style="color:var(--orange);">Firestore Security Rules (สำคัญ!)</h3><p style="color:var(--text2);font-size:.82rem;margin:8px 0;">เพื่อให้ข้อมูลปลอดภัยถาวร ให้ไปที่ <a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent2);">Firebase Console</a> → Firestore → Rules แล้ววาง:</p><pre style="background:var(--bg);padding:12px;border-radius:8px;font-size:.78rem;color:var(--green);overflow-x:auto;white-space:pre-wrap;">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read, write: if request.auth != null &amp;&amp; request.auth.uid == userId;
+      match /years/{year} {
+        allow read, write: if request.auth != null &amp;&amp; request.auth.uid == userId;
+      }
+    }
+  }
+}</pre></div>
 </div>
 </div>
 
@@ -268,6 +280,7 @@ firebase.initializeApp({
 });
 const auth=firebase.auth(), db=firebase.firestore();
 let currentUser=null, saveTimeout=null, data=defaultData();
+let currentYear=new Date().getFullYear()+543;
 
 function defaultData(){return{settings:{currency:'$',pairs:['EUR/USD','GBP/USD','AUD/USD','USD/JPY','EUR/JPY','GBP/JPY','AUD/JPY','JPY Currency Index','USD Currency Index','XAU/USD']},portfolio:{capital:16650,risk:3,sl:-30,tp:50,withdraw:30,reinvest:70,dayRisk:3,dayTP:5,daySL:6,maxTrades:5,timeLimit:35,rr:'0.05:0.06',days:[]},trades:[],transactions:[],diary:[]};}
 
@@ -281,14 +294,81 @@ auth.onAuthStateChanged(async u=>{
 
 async function loadCloud(){
   if(!currentUser)return;
-  try{const doc=await db.collection('users').doc(currentUser.uid).get();if(doc.exists){const d=doc.data();data={settings:d.settings||defaultData().settings,portfolio:d.portfolio||defaultData().portfolio,trades:d.trades||[],transactions:d.transactions||[],diary:d.diary||[]};if(!data.settings.pairs)data.settings.pairs=defaultData().settings.pairs;if(!data.portfolio.days)data.portfolio.days=[];if(!data.diary)data.diary=[];}else{data=defaultData();await saveCloud();}}
-  catch(e){console.error(e);data=defaultData();toast('โหลดข้อมูลไม่สำเร็จ');}
+  try{
+    const userRef=db.collection('users').doc(currentUser.uid);
+    const userDoc=await userRef.get();
+    /* Migration: old single-doc format → year subcollection */
+    if(userDoc.exists&&userDoc.data().trades){
+      const old=userDoc.data();
+      const yr=currentYear;
+      const yearData={portfolio:old.portfolio||defaultData().portfolio,trades:old.trades||[],transactions:old.transactions||[],diary:old.diary||[]};
+      await userRef.collection('years').doc(String(yr)).set(yearData);
+      await userRef.set({settings:old.settings||defaultData().settings,migrated:true});
+      toast('ย้ายข้อมูลเดิมไปปี '+yr+' สำเร็จ');
+    }
+    /* Load settings from user doc */
+    const uDoc=await userRef.get();
+    if(uDoc.exists&&uDoc.data().settings){data.settings=uDoc.data().settings;}
+    else{data.settings=defaultData().settings;}
+    if(!data.settings.pairs)data.settings.pairs=defaultData().settings.pairs;
+    /* Load year data from subcollection */
+    const yearDoc=await userRef.collection('years').doc(String(currentYear)).get();
+    if(yearDoc.exists){
+      const yd=yearDoc.data();
+      data.portfolio=yd.portfolio||defaultData().portfolio;
+      data.trades=yd.trades||[];
+      data.transactions=yd.transactions||[];
+      data.diary=yd.diary||[];
+    }else{
+      const def=defaultData();
+      data.portfolio=def.portfolio;data.trades=[];data.transactions=[];data.diary=[];
+    }
+    if(!data.portfolio.days)data.portfolio.days=[];
+    if(!data.diary)data.diary=[];
+    /* Populate year selector with available years */
+    await populateYearSelector();
+  }catch(e){console.error(e);data=defaultData();toast('โหลดข้อมูลไม่สำเร็จ');}
 }
 
 async function saveCloud(){
   if(!currentUser)return;showSave('saving');
-  try{await db.collection('users').doc(currentUser.uid).set(JSON.parse(JSON.stringify(data)));showSave('saved');}
-  catch(e){console.error(e);showSave('error');}
+  try{
+    const userRef=db.collection('users').doc(currentUser.uid);
+    await userRef.set({settings:JSON.parse(JSON.stringify(data.settings)),migrated:true});
+    await userRef.collection('years').doc(String(currentYear)).set(JSON.parse(JSON.stringify({portfolio:data.portfolio,trades:data.trades,transactions:data.transactions,diary:data.diary})));
+    showSave('saved');
+  }catch(e){console.error(e);showSave('error');}
+}
+
+async function populateYearSelector(){
+  const sel=document.getElementById('yearSelect');
+  const thisYear=new Date().getFullYear()+543;
+  /* List available years from Firestore */
+  let years=new Set();
+  try{
+    const snap=await db.collection('users').doc(currentUser.uid).collection('years').get();
+    snap.forEach(doc=>years.add(+doc.id));
+  }catch(e){}
+  /* Always include current year and this year */
+  years.add(currentYear);years.add(thisYear);
+  /* Add range: earliest year found to thisYear+1 */
+  const sorted=[...years].sort();
+  const minY=Math.min(sorted[0],2569);
+  const maxY=Math.max(sorted[sorted.length-1],thisYear)+1;
+  sel.innerHTML='';
+  for(let y=minY;y<=maxY;y++){
+    sel.innerHTML+=`<option value="${y}" ${y===currentYear?'selected':''}>ปี พ.ศ. ${y}</option>`;
+  }
+}
+
+async function switchYear(yr){
+  currentYear=+yr;
+  document.getElementById('loadingOverlay').classList.add('show');
+  await loadCloud();
+  document.getElementById('loadingOverlay').classList.remove('show');
+  initApp();
+  document.title='IRONMAN Trading Journal '+currentYear;
+  toast('เปลี่ยนเป็นปี '+currentYear);
 }
 
 function saveData(){clearTimeout(saveTimeout);saveTimeout=setTimeout(()=>saveCloud(),1000);}
@@ -300,7 +380,7 @@ function showPage(id,btn){document.querySelectorAll('.page').forEach(p=>p.classL
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
 
 let currentEntries=[];
-function initApp(){document.getElementById('tradeDate').value=new Date().toISOString().split('T')[0];document.getElementById('diaryDate').value=new Date().toISOString().split('T')[0];currentEntries=[];addTradeEntry();loadExistingDay();loadExistingDiary();loadPortConfig();document.getElementById('txDate').value=new Date().toISOString().split('T')[0];const m=new Date().getMonth();document.getElementById('portMonth').value=m;document.getElementById('wrCalMonth').value=m;}
+function initApp(){document.getElementById('tradeDate').value=new Date().toISOString().split('T')[0];document.getElementById('diaryDate').value=new Date().toISOString().split('T')[0];currentEntries=[];addTradeEntry();loadExistingDay();loadExistingDiary();loadPortConfig();document.getElementById('txDate').value=new Date().toISOString().split('T')[0];const m=new Date().getMonth();document.getElementById('portMonth').value=m;document.getElementById('wrCalMonth').value=m;document.title='IRONMAN Trading Journal '+currentYear;}
 
 function addTradeEntry(){currentEntries.push({time:'',num:currentEntries.length+1,result:'-',pair:'',emotionBefore:'',reason:'',winReason:'',lossReason:'',emotionAfter:''});renderTradeEntries();}
 function removeTradeEntry(i){currentEntries.splice(i,1);currentEntries.forEach((e,j)=>e.num=j+1);renderTradeEntries();}
@@ -361,7 +441,7 @@ function renderTxMonthly(){const ms=['ม.ค.','ก.พ.','มี.ค.','เม
 
 function getWL(){const r={};data.trades.forEach(t=>{const td=t.entries.filter(e=>e.result!=='-'),w=td.filter(e=>e.result==='TP').length,l=td.filter(e=>e.result==='SL').length;r[t.date]={wins:w,losses:l,total:w+l};});return r;}
 function renderWinrateMonthly(){const wl=getWL(),ms=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'],tb=document.querySelector('#wrMonthlyTable tbody');let tw=0,tl=0,h='';ms.forEach((n,m)=>{let w=0,l=0;Object.entries(wl).forEach(([d,v])=>{if(new Date(d).getMonth()===m){w+=v.wins;l+=v.losses;}});tw+=w;tl+=l;const tot=w+l;if(tot>0){const wr=(w/tot*100).toFixed(1)+'%',bw=w/tot*100;h+=`<tr><td>${n}</td><td class="pnl-pos">${w}</td><td class="pnl-neg">${l}</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:80px;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;"><div style="width:${bw}%;height:100%;background:var(--green);border-radius:4px;"></div></div><span>${wr}</span></div></td><td>${tot}</td></tr>`;}});const ta=tw+tl;h+=`<tr style="font-weight:700;border-top:2px solid var(--accent);"><td>รวม</td><td class="pnl-pos">${tw}</td><td class="pnl-neg">${tl}</td><td>${ta>0?(tw/ta*100).toFixed(1)+'%':'-'}</td><td>${ta}</td></tr>`;tb.innerHTML=h;}
-function renderWinrateCalendar(){const m=+document.getElementById('wrCalMonth').value,yr=2026,wl=getWL(),cal=document.getElementById('wrCalendar'),dim=new Date(yr,m+1,0).getDate(),fd=new Date(yr,m,1).getDay(),hds=['อา','จ','อ','พ','พฤ','ศ','ส'];let h=hds.map(x=>`<div class="cal-cell cal-header">${x}</div>`).join('');for(let i=0;i<fd;i++)h+='<div class="cal-cell cal-empty"></div>';for(let d=1;d<=dim;d++){const ds=`${yr}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`,dd=wl[ds];let c='cal-nodata';if(dd&&dd.total>0){const wr=dd.wins/dd.total;c=wr>0.5?'cal-win':wr<0.5?'cal-loss':'cal-even';}h+=`<div class="cal-cell ${c}" title="${ds}: ${dd?dd.wins+'W '+dd.losses+'L':'ไม่มีข้อมูล'}">${d}</div>`;}cal.innerHTML=h;}
+function renderWinrateCalendar(){const m=+document.getElementById('wrCalMonth').value,yr=currentYear-543,wl=getWL(),cal=document.getElementById('wrCalendar'),dim=new Date(yr,m+1,0).getDate(),fd=new Date(yr,m,1).getDay(),hds=['อา','จ','อ','พ','พฤ','ศ','ส'];let h=hds.map(x=>`<div class="cal-cell cal-header">${x}</div>`).join('');for(let i=0;i<fd;i++)h+='<div class="cal-cell cal-empty"></div>';for(let d=1;d<=dim;d++){const ds=`${yr}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`,dd=wl[ds];let c='cal-nodata';if(dd&&dd.total>0){const wr=dd.wins/dd.total;c=wr>0.5?'cal-win':wr<0.5?'cal-loss':'cal-even';}h+=`<div class="cal-cell ${c}" title="${ds}: ${dd?dd.wins+'W '+dd.losses+'L':'ไม่มีข้อมูล'}">${d}</div>`;}cal.innerHTML=h;}
 function renderWinrateDaily(){const m=+document.getElementById('wrCalMonth').value,wl=getWL(),tb=document.querySelector('#wrDailyTable tbody');let h='';Object.entries(wl).filter(([d])=>new Date(d).getMonth()===m).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([d,v])=>{if(!v.total)return;h+=`<tr><td>${formatDate(d)}</td><td class="pnl-pos">${v.wins}</td><td class="pnl-neg">${v.losses}</td><td>${(v.wins/v.total*100).toFixed(1)}%</td><td>${v.total}</td></tr>`;});tb.innerHTML=h||'<tr><td colspan="5" style="text-align:center;color:var(--text2);">ยังไม่มีข้อมูลเดือนนี้</td></tr>';}
 
 function renderDashboard(){
