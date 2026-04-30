@@ -598,7 +598,7 @@ function loadDiary(){const date=document.getElementById('diaryDate').value;docum
 function saveDiary(){const date=document.getElementById('diaryDate').value,text=document.getElementById('diaryText').value;if(!date)return;const i=DB.diary.findIndex(d=>d.date===date);const e={id:i>=0?DB.diary[i].id:genId(),date,text};if(i>=0)DB.diary[i]=e;else DB.diary.push(e);saveDB();toast('บันทึก Diary สำเร็จ!')}
 
 // === TAB 5: DASHBOARD ===
-function initDashYear(){const s=document.getElementById('dashYear'),y=new Date().getFullYear();for(let i=y;i>=y-5;i--)s.innerHTML+='<option value="'+i+'">'+(i+543)+'</option>'}
+function initDashYear(){const s=document.getElementById('dashYear'),y=new Date().getFullYear(),startY=2025;for(let i=y;i>=startY;i--)s.innerHTML+='<option value="'+i+'">'+(i+543)+'</option>'}
 function renderDashboard(){
   const mf=document.getElementById('dashMonth').value,yr=parseInt(document.getElementById('dashYear').value);
   const trades=DB.trades.filter(t=>{const d=new Date(t.date);return d.getFullYear()===yr&&(mf===''||d.getMonth()===parseInt(mf))});
