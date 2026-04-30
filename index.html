@@ -552,52 +552,116 @@ function loadMascot(){const s=localStorage.getItem('ironman_mascot');if(s)applyM
 function changeTradeDate(d){const inp=document.getElementById('tradeDate');const dt=new Date(inp.value);dt.setDate(dt.getDate()+d);inp.value=dt.toISOString().slice(0,10);loadDayTrades()}
 
 function renderPnlTracker(){
+  if(window._skipTracker)return;
   const el=document.getElementById('pnlTrackerContent');
   const p=DB.portfolio;
   if(!p||!p.capital){el.innerHTML='<div class="empty-state"><div class="icon">&#128034;</div><p>ตั้งค่าพอร์ตเต่าก่อนเพื่อดูเป้ารายวัน</p></div>';return}
+  const cap=p.capital,riskPct=p.risk||1,tpPct=p.dayTP||5,slPct=p.daySL||6;
+  const lotSize=cap*(riskPct/100);
+  const tpAmt=cap*(tpPct/100),slAmt=cap*(slPct/100);
   const date=document.getElementById('tradeDate').value;
   const dt=DB.trades.filter(t=>t.date===date).sort((a,b)=>a.tradeNum-b.tradeNum);
-  const cap=p.capital,tpPct=p.dayTP||5,slPct=p.daySL||6;
-  const tpAmt=cap*(tpPct/100),slAmt=cap*(slPct/100);
-  let runPnl=0;
-  const rows=dt.map(t=>{runPnl+=(t.pnl||0);const pct=cap>0?((t.pnl||0)/cap*100):0;const runPct=cap>0?(runPnl/cap*100):0;return t});
-  runPnl=dt.reduce((s,t)=>s+(t.pnl||0),0);
-  const netPct=cap>0?(runPnl/cap*100):0;
-  const endBal=cap+runPnl;
-  const hitTP=runPnl>=tpAmt,hitSL=runPnl<=-slAmt;
-  let progPct=0,progColor='var(--accent-blue)';
-  if(runPnl>=0){progPct=tpAmt>0?Math.min((runPnl/tpAmt)*100,100):0;progColor=hitTP?'var(--accent-green)':'var(--accent-cyan)'}
-  else{progPct=slAmt>0?Math.min((Math.abs(runPnl)/slAmt)*100,100):0;progColor=hitSL?'var(--accent-red)':'var(--accent-orange)'}
-  let thCols='<th style="width:90px"></th>';
-  let rowPnl='<td style="font-weight:600;text-align:left;font-size:12px;color:var(--text-muted)">PNL</td>';
-  let rowAmt='<td style="font-weight:600;text-align:left;font-size:12px;color:var(--text-muted)">ผลลัพธ์</td>';
-  let rowPct='<td style="font-weight:600;text-align:left;font-size:12px;color:var(--text-muted)">%</td>';
+  // Build 5-column data
+  let vals=[];
+  for(let i=0;i<5;i++){
+    const t=dt[i];
+    const pnlVal=t?((t.pnl||0)):0;
+    const pnlPct=lotSize>0?(pnlVal/lotSize*100):0;
+    vals.push({pnl:pnlVal,pct:pnlPct,exists:!!t,tradeId:t?t.id:null})
+  }
   let cumPnl=0;
-  dt.forEach((t,i)=>{
-    thCols+='<th>ไม้ '+(i+1)+'</th>';
-    const tp=t.pnl||0;cumPnl+=tp;
-    const pc=cap>0?(tp/cap*100).toFixed(2):'0.00';
-    const cls=tp>0?'pnl-pos':tp<0?'pnl-neg':'pnl-zero';
-    rowPnl+='<td class="'+cls+'">'+(tp>0?'+':'')+pc+'%</td>';
-    rowAmt+='<td class="'+cls+'">'+(tp>0?'+':'')+tp.toLocaleString()+'฿</td>';
-    rowPct+='<td class="'+cls+'">'+(cap>0?(cumPnl/cap*100).toFixed(2):'0.00')+'%</td>';
-  });
-  if(dt.length===0){thCols+='<th>-</th>';rowPnl+='<td>0.00%</td>';rowAmt+='<td>0฿</td>';rowPct+='<td>0.00%</td>'}
+  let totalPnl=vals.reduce((s,v)=>s+v.pnl,0);
+  const netPct=cap>0?(totalPnl/cap*100):0;
+  const endBal=cap+totalPnl;
+  const hitTP=totalPnl>=tpAmt,hitSL=totalPnl<=-slAmt;
+  let progPct=0,progColor='var(--accent-blue)';
+  if(totalPnl>=0){progPct=tpAmt>0?Math.min((totalPnl/tpAmt)*100,100):0;progColor=hitTP?'var(--accent-green)':'var(--accent-cyan)'}
+  else{progPct=slAmt>0?Math.min((Math.abs(totalPnl)/slAmt)*100,100):0;progColor=hitSL?'var(--accent-red)':'var(--accent-orange)'}
   let html='<div class="pnl-tracker-grid">';
   html+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
-  html+='<div class="pnl-target-row tp" style="flex:1;min-width:140px"><div><div class="pnl-target-label">เป้า TP (+'+tpPct+'%)</div><div class="pnl-target-value" style="color:var(--accent-green)">+฿'+tpAmt.toLocaleString()+'</div></div>'+(hitTP?'<span style="font-size:20px">&#9989;</span>':'')+'</div>';
-  html+='<div class="pnl-target-row sl" style="flex:1;min-width:140px"><div><div class="pnl-target-label">หยุด SL (-'+slPct+'%)</div><div class="pnl-target-value" style="color:var(--accent-red)">-฿'+slAmt.toLocaleString()+'</div></div>'+(hitSL?'<span style="font-size:20px">&#9940;</span>':'')+'</div>';
-  html+='<div class="pnl-target-row net" style="flex:1;min-width:140px"><div><div class="pnl-target-label">PNL วันนี้</div><div class="pnl-target-value" style="color:'+(runPnl>=0?'var(--accent-green)':'var(--accent-red)')+'">'+(runPnl>=0?'+':'')+runPnl.toLocaleString()+'฿ ('+netPct.toFixed(2)+'%)</div></div></div>';
+  html+='<div class="pnl-target-row tp" style="flex:1;min-width:120px"><div><div class="pnl-target-label">เป้า TP (+'+tpPct+'%)</div><div class="pnl-target-value" style="color:var(--accent-green)">+฿'+tpAmt.toLocaleString()+'</div></div>'+(hitTP?'<span style="font-size:18px">&#9989;</span>':'')+'</div>';
+  html+='<div class="pnl-target-row sl" style="flex:1;min-width:120px"><div><div class="pnl-target-label">หยุด SL (-'+slPct+'%)</div><div class="pnl-target-value" style="color:var(--accent-red)">-฿'+slAmt.toLocaleString()+'</div></div>'+(hitSL?'<span style="font-size:18px">&#9940;</span>':'')+'</div>';
+  html+='<div class="pnl-target-row net" style="flex:1;min-width:120px"><div><div class="pnl-target-label">ขนาดไม้ ('+riskPct+'%)</div><div class="pnl-target-value" style="color:var(--accent-cyan)">฿'+lotSize.toLocaleString()+'</div></div></div>';
+  html+='<div class="pnl-target-row net" style="flex:1;min-width:120px"><div><div class="pnl-target-label">PNL วันนี้</div><div class="pnl-target-value" style="color:'+(totalPnl>=0?'var(--accent-green)':'var(--accent-red)')+'">'+(totalPnl>=0?'+':'')+totalPnl.toLocaleString()+'฿ ('+netPct.toFixed(2)+'%)</div></div></div>';
   html+='</div>';
-  html+='<div class="pnl-progress-wrap"><div class="pnl-progress-bar" style="width:'+progPct+'%;background:'+progColor+'"></div><div class="pnl-progress-label">'+(runPnl>=0?'TP':'SL')+' '+progPct.toFixed(0)+'%</div></div>';
-  html+='<table class="pnl-summary-table"><thead><tr>'+thCols+'</tr></thead><tbody>';
-  html+='<tr>'+rowPnl+'</tr><tr>'+rowAmt+'</tr><tr>'+rowPct+'</tr>';
-  html+='<tr><td style="font-weight:600;text-align:left;font-size:12px;color:var(--text-muted)">สุทธิ</td><td colspan="'+Math.max(dt.length,1)+'" style="font-weight:700;color:'+(runPnl>=0?'var(--accent-green)':'var(--accent-red)')+'">'+(runPnl>=0?'+':'')+runPnl.toLocaleString()+'฿</td></tr>';
-  html+='<tr style="background:var(--bg-hover)"><td style="font-weight:600;text-align:left;font-size:12px;color:var(--text-muted)">จบวัน</td><td colspan="'+Math.max(dt.length,1)+'" style="font-weight:700;color:var(--accent-orange)">฿'+endBal.toLocaleString()+'</td></tr>';
+  html+='<div class="pnl-progress-wrap"><div class="pnl-progress-bar" style="width:'+progPct+'%;background:'+progColor+'"></div><div class="pnl-progress-label">'+(totalPnl>=0?'TP':'SL')+' '+progPct.toFixed(0)+'%</div></div>';
+  // Table with 5 fixed columns
+  html+='<table class="pnl-summary-table"><thead><tr><th style="width:70px"></th>';
+  for(let i=1;i<=5;i++)html+='<th>ไม้ '+i+'</th>';
+  html+='</tr></thead><tbody>';
+  // PNL % row - editable inputs
+  html+='<tr><td style="font-weight:600;text-align:left;font-size:12px;color:var(--text-muted)">PNL %</td>';
+  for(let i=0;i<5;i++){
+    const v=vals[i];
+    const pctVal=v.pct!==0?v.pct.toFixed(2):'';
+    html+='<td><input type="number" step="0.01" class="pnl-input" id="pnlPct'+i+'" value="'+pctVal+'" placeholder="0.00" onchange="onPnlPctChange('+i+')" style="width:70px;text-align:center;padding:4px;border:1px solid var(--bg-hover);border-radius:4px;background:var(--card-bg);color:var(--text-primary);font-size:13px"></td>';
+  }
+  html+='</tr>';
+  // ผลลัพธ์ row - auto calculated
+  html+='<tr><td style="font-weight:600;text-align:left;font-size:12px;color:var(--text-muted)">ผลลัพธ์</td>';
+  for(let i=0;i<5;i++){
+    const v=vals[i];
+    const cls=v.pnl>0?'pnl-pos':v.pnl<0?'pnl-neg':'pnl-zero';
+    html+='<td class="'+cls+'" id="pnlAmt'+i+'">'+(v.pnl!==0?((v.pnl>0?'+':'')+v.pnl.toLocaleString()+'฿'):'0฿')+'</td>';
+  }
+  html+='</tr>';
+  // Cumulative % row
+  html+='<tr><td style="font-weight:600;text-align:left;font-size:12px;color:var(--text-muted)">% สะสม</td>';
+  cumPnl=0;
+  for(let i=0;i<5;i++){
+    cumPnl+=vals[i].pnl;
+    const cumPct=cap>0?(cumPnl/cap*100).toFixed(2):'0.00';
+    const cls=cumPnl>0?'pnl-pos':cumPnl<0?'pnl-neg':'pnl-zero';
+    html+='<td class="'+cls+'" id="pnlCum'+i+'">'+cumPct+'%</td>';
+  }
+  html+='</tr>';
+  // สุทธิ row
+  html+='<tr><td style="font-weight:600;text-align:left;font-size:12px;color:var(--text-muted)">สุทธิ</td>';
+  html+='<td colspan="5" style="font-weight:700;text-align:center;color:'+(totalPnl>=0?'var(--accent-green)':'var(--accent-red)')+'" id="pnlNet">'+(totalPnl>=0?'+':'')+totalPnl.toLocaleString()+'฿</td></tr>';
+  // จบวัน row
+  html+='<tr style="background:var(--bg-hover)"><td style="font-weight:600;text-align:left;font-size:12px;color:var(--text-muted)">จบวัน</td>';
+  html+='<td colspan="5" style="font-weight:700;text-align:center;color:var(--accent-orange)" id="pnlEnd">฿'+endBal.toLocaleString()+'</td></tr>';
   html+='</tbody></table></div>';
   if(hitTP)html+='<div style="text-align:center;margin-top:8px;padding:8px;border-radius:8px;background:rgba(76,175,80,0.15);color:var(--accent-green);font-weight:700">&#127942; ถึงเป้า TP แล้ว! หยุดเทรดวันนี้ &#128034;</div>';
   if(hitSL)html+='<div style="text-align:center;margin-top:8px;padding:8px;border-radius:8px;background:rgba(244,67,54,0.15);color:var(--accent-red);font-weight:700">&#9888;&#65039; ถึง SL แล้ว! หยุดเทรดวันนี้ &#128034;</div>';
   el.innerHTML=html}
+function onPnlPctChange(idx){
+  const p=DB.portfolio;if(!p||!p.capital)return;
+  const cap=p.capital,riskPct=p.risk||1,lotSize=cap*(riskPct/100);
+  const pctInput=document.getElementById('pnlPct'+idx);
+  const pctVal=parseFloat(pctInput.value)||0;
+  const pnlAmt=lotSize*(pctVal/100);
+  // Update the trade's PNL if it exists
+  const date=document.getElementById('tradeDate').value;
+  const dt=DB.trades.filter(t=>t.date===date).sort((a,b)=>a.tradeNum-b.tradeNum);
+  if(dt[idx]){dt[idx].pnl=Math.round(pnlAmt);saveDB()}
+  // Recalculate all display values
+  let tots=[];
+  for(let i=0;i<5;i++){
+    const inp=document.getElementById('pnlPct'+i);
+    const pc=parseFloat(inp.value)||0;
+    const am=lotSize*(pc/100);
+    tots.push(am);
+    const cls=am>0?'pnl-pos':am<0?'pnl-neg':'pnl-zero';
+    const amEl=document.getElementById('pnlAmt'+i);
+    if(amEl){amEl.className=cls;amEl.textContent=am!==0?((am>0?'+':'')+Math.round(am).toLocaleString()+'฿'):'0฿'}
+  }
+  let cum=0;
+  for(let i=0;i<5;i++){
+    cum+=tots[i];
+    const cumPct=cap>0?(cum/cap*100).toFixed(2):'0.00';
+    const cls=cum>0?'pnl-pos':cum<0?'pnl-neg':'pnl-zero';
+    const cumEl=document.getElementById('pnlCum'+i);
+    if(cumEl){cumEl.className=cls;cumEl.textContent=cumPct+'%'}
+  }
+  const totalPnl=tots.reduce((s,v)=>s+v,0);
+  const netEl=document.getElementById('pnlNet');
+  if(netEl){netEl.style.color=totalPnl>=0?'var(--accent-green)':'var(--accent-red)';netEl.textContent=(totalPnl>=0?'+':'')+Math.round(totalPnl).toLocaleString()+'฿'}
+  const endEl=document.getElementById('pnlEnd');
+  if(endEl)endEl.textContent='฿'+Math.round(cap+totalPnl).toLocaleString();
+  // Update trades table PNL column too - but don't re-render tracker
+  window._skipTracker=true;loadDayTrades();window._skipTracker=false}
+
 
 function loadDayTrades(){
   const date=document.getElementById('tradeDate').value;
