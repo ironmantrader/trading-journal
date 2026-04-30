@@ -465,7 +465,10 @@ async function loadFromCloud(){
       if((local.trades||[]).length>0)saveToCloud();
     }
     setSyncStatus('online','Cloud Sync');
-    location.reload();
+    document.getElementById('tradeDate').value=today();loadDayTrades();
+    document.getElementById('ptjDate').value=today();loadPTJ();
+    document.getElementById('diaryDate').value=today();loadDiary();
+    initDashYear();loadPortfolio();renderTxTable();loadMascot();
   }catch(e){
     console.error('Cloud load error:',e);
     setSyncStatus('offline','Sync Error');
