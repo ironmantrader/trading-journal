@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IRONMAN Trading Journal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap');
+:root {
+  --bg-primary: #111015;
+  --bg-secondary: #1c1a24;
+  --bg-card: #26232f;
+  --bg-input: #312d3a;
+  --bg-hover: #3a3545;
+  --text-primary: #f0ece8;
+  --text-secondary: #b8afc4;
+  --text-muted: #7a7189;
+  --accent-orange: #f97316;
+  --accent-orange-bright: #fb923c;
+  --accent-orange-dim: rgba(249,115,22,0.15);
+  --accent-green: #0ecb81;
+  --accent-green-dim: rgba(14,203,129,0.15);
+  --accent-red: #f6465d;
+  --accent-red-dim: rgba(246,70,93,0.15);
+  --accent-blue: #38bdf8;
+  --accent-blue-dim: rgba(56,189,248,0.15);
+  --accent-purple: #a855f7;
+  --accent-purple-dim: rgba(168,85,247,0.15);
+  --accent-cyan: #06b6d4;
+  --border: rgba(255,255,255,0.07);
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --radius: 14px;
+  --radius-sm: 8px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans Thai','Inter',sans-serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:hidden}
+.header{background:linear-gradient(135deg,#1c1a24 0%,#26232f 100%);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(20px)}
+.header-left{display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;background:linear-gradient(135deg,#f97316,#ea580c);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;cursor:pointer}
+.mascot-header{width:40px;height:40px;border-radius:10px;object-fit:cover;cursor:pointer;border:2px solid var(--accent-orange);display:none}
+.header h1{font-size:20px;font-weight:700;background:linear-gradient(90deg,#ff8c42,#ffd4a8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header-actions{display:flex;gap:8px}
+.btn-icon{background:var(--bg-input);border:1px solid var(--border);color:var(--text-secondary);padding:8px 14px;border-radius:var(--radius-sm);cursor:pointer;font-size:13px;transition:all .2s;font-family:inherit}
+.btn-icon:hover{background:var(--bg-hover);color:var(--accent-orange);border-color:var(--accent-orange)}
+.tab-bar{display:flex;background:var(--bg-secondary);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.tab-bar::-webkit-scrollbar{display:none}
+.tab-btn{padding:14px 20px;background:none;border:none;color:var(--text-muted);font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s;font-family:inherit}
+.tab-btn:hover{color:var(--text-secondary)}
+.tab-btn.active{color:var(--accent-orange);border-bottom-color:var(--accent-orange)}
+.main{padding:20px;max-width:1200px;margin:0 auto}
+.tab-content{display:none}.tab-content.active{display:block;animation:fadeIn .3s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card-title{font-size:16px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.card-title .icon{font-size:20px}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.form-group{display:flex;flex-direction:column;gap:6px}.form-group.full{grid-column:1/-1}
+.form-label{font-size:12px;font-weight:500;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.form-input,.form-select,.form-textarea{background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);padding:10px 14px;border-radius:var(--radius-sm);font-size:14px;font-family:inherit;transition:border-color .2s;outline:none}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent-orange);box-shadow:0 0 0 3px var(--accent-orange-dim)}
+.form-textarea{resize:vertical;min-height:60px}
+.form-select{cursor:pointer}.form-select option{background:var(--bg-card)}
+.emotion-selector{display:flex;gap:6px;flex-wrap:wrap}
+.emotion-chip{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-secondary);font-size:13px;cursor:pointer;transition:all .2s;font-family:inherit}
+.emotion-chip:hover{border-color:var(--accent-orange)}
+.emotion-chip.selected{background:var(--accent-orange-dim);border-color:var(--accent-orange);color:var(--accent-orange)}
+.btn{padding:10px 24px;border-radius:var(--radius-sm);border:none;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:linear-gradient(135deg,#f97316,#ea580c);color:#fff}
+.btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.btn-secondary{background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--accent-orange)}
+.btn-danger{background:var(--accent-red-dim);color:var(--accent-red);border:1px solid rgba(246,70,93,.3)}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn-group{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.table-container{overflow-x:auto;margin-top:12px;border-radius:var(--radius-sm)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:var(--bg-input);padding:10px 12px;text-align:left;font-weight:600;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;border-bottom:1px solid var(--border)}
+td{padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap}
+tr:hover td{background:var(--bg-hover)}
+.pnl-pos{color:var(--accent-green);font-weight:600}
+.pnl-neg{color:var(--accent-red);font-weight:600}
+.pnl-zero{color:var(--text-muted)}
+.result-badge{padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.result-tp{background:var(--accent-green-dim);color:var(--accent-green)}
+.result-sl{background:var(--accent-red-dim);color:var(--accent-red)}
+.result-be{background:var(--accent-blue-dim);color:var(--accent-blue)}
+.result-none{background:rgba(255,255,255,.05);color:var(--text-muted)}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center}
+.stat-value{font-size:28px;font-weight:800;margin:4px 0}
+.stat-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px}
+.stat-sub{font-size:12px;margin-top:4px}
+.chart-container{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+.chart-wrap{position:relative;height:280px}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.filter-bar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.filter-bar .form-input,.filter-bar .form-select{padding:8px 12px;font-size:13px}
+.ptj-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.history-item{background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px;cursor:pointer;transition:all .2s}
+.history-item:hover{border-color:var(--accent-orange);background:var(--bg-hover)}
+.history-date{font-size:12px;color:var(--accent-orange);font-weight:600;margin-bottom:6px}
+.history-summary{font-size:13px;color:var(--text-secondary);line-height:1.5}
+.history-tags{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.tag{padding:2px 10px;border-radius:10px;font-size:11px;font-weight:500}
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.show{display:flex}
+.modal{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto}
+.modal h3{margin-bottom:16px}
+.plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.plan-card{background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px}
+.plan-card h4{font-size:13px;color:var(--accent-orange);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.plan-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid var(--border)}
+.plan-row:last-child{border:none}
+.plan-row span:first-child{color:var(--text-secondary)}
+.trade-counter{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:12px 16px;background:var(--bg-input);border-radius:var(--radius-sm);border-left:3px solid var(--accent-orange)}
+.trade-counter .day-label{font-size:14px;font-weight:600;color:var(--accent-orange)}
+.trade-counter .trade-num{font-size:13px;color:var(--text-secondary)}
+.empty-state{text-align:center;padding:40px 20px;color:var(--text-muted)}
+.empty-state .icon{font-size:48px;margin-bottom:12px}
+.date-nav{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.date-nav button{background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.date-nav button:hover{border-color:var(--accent-orange);color:var(--accent-orange)}
+.date-nav .current-date{font-size:18px;font-weight:700;color:var(--accent-orange)}
+.hidden-input{display:none}
+.toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;border-radius:var(--radius-sm);font-size:14px;font-weight:600;z-index:300;animation:slideUp .3s;font-family:inherit}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}}
+/* Welcome */
+.welcome-banner{background:linear-gradient(135deg,rgba(249,115,22,.1) 0%,rgba(234,88,12,.06) 100%);border:1px solid rgba(249,115,22,.2);border-radius:var(--radius);padding:20px;margin-bottom:16px;display:flex;align-items:center;gap:20px}
+.welcome-text h2{font-size:20px;font-weight:800;color:var(--accent-orange);margin-bottom:4px}
+.welcome-text p{font-size:13px;color:var(--text-secondary);line-height:1.5}
+.welcome-motto{font-size:11px;color:var(--accent-orange-bright);font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-top:8px}
+.mascot-placeholder{width:100px;height:100px;border-radius:14px;border:2px dashed var(--accent-orange);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:var(--accent-orange);font-size:11px;gap:4px;transition:all .2s;background:var(--accent-orange-dim);flex-shrink:0}
+.mascot-placeholder:hover{background:rgba(249,115,22,.25)}
+.mascot-placeholder .mp-icon{font-size:28px}
+.mascot-img{max-height:100px;border-radius:14px;filter:drop-shadow(0 4px 12px rgba(249,115,22,.3));cursor:pointer;flex-shrink:0}
+.mascot-img:hover{transform:scale(1.03)}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:var(--bg-primary)}::-webkit-scrollbar-thumb{background:var(--bg-hover);border-radius:3px}
+.ai-range-btn.active{background:var(--accent-orange-dim)!important;border-color:var(--accent-orange)!important;color:var(--accent-orange)!important}
+.sync-status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);padding:4px 10px;border-radius:var(--radius-sm);background:var(--bg-input)}
+.sync-status.online{color:var(--accent-green)}
+.sync-status.syncing{color:var(--accent-orange)}
+.sync-status.offline{color:var(--text-muted)}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+.sync-status.syncing .sync-dot{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.auth-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-primary);cursor:pointer;font-size:12px;font-weight:500;transition:all .2s}
+.auth-btn:hover{border-color:var(--accent-orange);background:var(--accent-orange-dim)}
+.auth-btn img{width:18px;height:18px;border-radius:50%}
+.auth-avatar{width:24px;height:24px;border-radius:50%;border:2px solid var(--accent-green)}
+@media(max-width:768px){.header{padding:12px 16px}.main{padding:12px}.form-grid,.ptj-grid{grid-template-columns:1fr}.stat-grid{grid-template-columns:repeat(2,1fr)}.header h1{font-size:16px}.charts-row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-left">
+    <img id="headerMascot" class="mascot-header" alt="IT" title="คลิกเปลี่ยนรูป">
+    <div class="logo" id="headerLogoFallback" title="คลิกเพิ่มรูป Mascot">IT</div>
+    <input type="file" id="mascotUpload" class="hidden-input" accept="image/*">
+    <h1>IRONMAN Trading Journal</h1>
+  </div>
+  <div class="header-actions">
+    <button class="btn-icon" onclick="openAIExport()" style="background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;border-color:transparent;font-weight:600">&#129302; Export AI</button>
+    <button class="btn-icon" onclick="exportData()">Export JSON</button>
+    <button class="btn-icon" onclick="document.getElementById('importFile').click()">Import</button>
+    <input type="file" id="importFile" class="hidden-input" accept=".json">
+    <div id="syncStatus" class="sync-status offline"><span class="sync-dot"></span><span id="syncText">Offline</span></div>
+    <div id="authArea"><button class="auth-btn" onclick="firebaseLogin()"><svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Login</button></div>
+  </div>
+</div>
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="trades" onclick="switchTab('trades')">&#9889; บันทึกไม้</button>
+  <button class="tab-btn" data-tab="postTrade" onclick="switchTab('postTrade')">&#128221; วัดผลสิ้นวัน</button>
+  <button class="tab-btn" data-tab="tradelog" onclick="switchTab('tradelog')">&#128176; Tradelog</button>
+  <button class="tab-btn" data-tab="diary" onclick="switchTab('diary')">&#128214; Diary</button>
+  <button class="tab-btn" data-tab="dashboard" onclick="switchTab('dashboard')">&#128200; Dashboard</button>
+  <button class="tab-btn" data-tab="portfolio" onclick="switchTab('portfolio')">&#128034; พอร์ตเต่า</button>
+  <button class="tab-btn" data-tab="history" onclick="switchTab('history')">&#128197; ย้อนหลัง</button>
+</div>
+<div class="main">
+
+<!-- TAB 1 -->
+<div id="tab-trades" class="tab-content active">
+  <div class="welcome-banner" id="welcomeBanner">
+    <div id="mascotArea">
+      <div class="mascot-placeholder" onclick="document.getElementById('mascotUpload').click()"><span class="mp-icon">&#128248;</span><span>เพิ่มรูป Mascot</span></div>
+    </div>
+    <div class="welcome-text">
+      <h2>IRONMAN TRADER</h2>
+      <p>หยุดให้เป็น เย็นให้พอ รอให้ได้</p>
+      <div class="welcome-motto">Discipline. Patience. Freedom.</div>
+    </div>
+  </div>
+  <div class="date-nav">
+    <button onclick="changeTradeDate(-1)">&#8592;</button>
+    <input type="date" id="tradeDate" class="form-input" onchange="loadDayTrades()">
+    <button onclick="changeTradeDate(1)">&#8594;</button>
+    <span class="current-date" id="tradeDayLabel"></span>
+  </div>
+  <div class="trade-counter">
+    <span class="day-label" id="dayTradeCount">ไม้ที่ 0</span>
+    <span class="trade-num" id="dayTradeStats">ยังไม่มีการเทรดวันนี้</span>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="icon">&#9889;</span> <span id="tradeFormTitle">เพิ่มไม้ใหม่</span></div>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">สถานที่</label><input type="text" id="tradePlace" class="form-input" placeholder="เช่น บ้าน, คาเฟ่"></div>
+      <div class="form-group"><label class="form-label">เวลา (24 ชม.)</label><input type="text" id="tradeTime" class="form-input" placeholder="เช่น 14:30" maxlength="5" oninput="formatTime24(this)"></div>
+      <div class="form-group"><label class="form-label">ผลการเทรด</label><select id="tradeResult" class="form-select" onchange="toggleResultFields()"><option value="-">- (ไม่เทรด)</option><option value="TP">TP (ชนะ)</option><option value="SL">SL (แพ้)</option><option value="BE">BE (เสมอ)</option></select></div>
+      <div class="form-group"><label class="form-label">คู่เงิน</label><input type="text" id="tradePair" class="form-input" placeholder="เช่น XAUUSD, EURUSD"></div>
+      <div class="form-group full"><label class="form-label">อารมณ์ก่อนเทรด</label>
+        <div class="emotion-selector" id="emotionBefore">
+          <button class="emotion-chip" data-val="ตามวินัย ตามรูปแบบ" onclick="selectEmotion(this)">ตามวินัย ตามรูปแบบ</button>
+          <button class="emotion-chip" data-val="มั่นใจ" onclick="selectEmotion(this)">มั่นใจ</button>
+          <button class="emotion-chip" data-val="กลัว" onclick="selectEmotion(this)">กลัว</button>
+          <button class="emotion-chip" data-val="FOMO" onclick="selectEmotion(this)">FOMO</button>
+          <button class="emotion-chip" data-val="เครียด" onclick="selectEmotion(this)">เครียด</button>
+          <button class="emotion-chip" data-val="สงบ" onclick="selectEmotion(this)">สงบ</button>
+          <button class="emotion-chip" data-val="อยากแก้มือ" onclick="selectEmotion(this)">อยากแก้มือ</button>
+        </div>
+        <input type="text" id="emotionBeforeCustom" class="form-input" placeholder="หรือพิมพ์เอง..." style="margin-top:6px">
+      </div>
+      <div class="form-group full"><label class="form-label">เหตุผลการเข้าออเดอร์</label><textarea id="tradeReason" class="form-textarea" placeholder="เช่น ตามเทรนด์ขาลง, เข้าที่แนวรับ..."></textarea></div>
+      <div class="form-group" id="winReasonGroup"><label class="form-label">ชนะเพราะว่า</label><textarea id="winReason" class="form-textarea" placeholder="วิเคราะห์สาเหตุที่ชนะ..."></textarea></div>
+      <div class="form-group" id="loseReasonGroup"><label class="form-label">แพ้เพราะว่า</label><textarea id="loseReason" class="form-textarea" placeholder="วิเคราะห์สาเหตุที่แพ้..."></textarea></div>
+      <div class="form-group full"><label class="form-label">อารมณ์หลังเทรด</label><textarea id="emotionAfter" class="form-textarea" placeholder="รู้สึกอย่างไรหลังจบไม้นี้..."></textarea></div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="saveTrade()" id="btnSaveTrade">&#10003; บันทึกไม้</button>
+      <button class="btn btn-secondary" onclick="cancelEditTrade()" id="btnCancelTrade">ล้างฟอร์ม</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="icon">&#128203;</span> รายการไม้วันนี้</div>
+    <div class="table-container"><table><thead><tr><th>ไม้ที่</th><th>เวลา</th><th>ผล</th><th>คู่เงิน</th><th>สถานที่</th><th>อารมณ์ก่อน</th><th>เหตุผล</th><th></th></tr></thead><tbody id="dayTradesTable"></tbody></table></div>
+  </div>
+</div>
+
+<!-- TAB 2 -->
+<div id="tab-postTrade" class="tab-content">
+  <div class="date-nav"><button onclick="changePTJDate(-1)">&#8592;</button><input type="date" id="ptjDate" class="form-input" onchange="loadPTJ()"><button onclick="changePTJDate(1)">&#8594;</button><span class="current-date" id="ptjDayLabel"></span></div>
+  <div class="card">
+    <div class="card-title"><span class="icon">&#128221;</span> Post-Trade Journal</div>
+    <div class="ptj-grid">
+      <div class="form-group"><label class="form-label">Winrate วันนี้</label><input type="text" id="ptjWinrate" class="form-input" readonly></div>
+      <div class="form-group"><label class="form-label">มีไม้ไหน "ไม่เข้าเงื่อนไข" แต่ยังฝืนกดไหม</label><select id="ptjForced" class="form-select"><option value="ไม่มี">ไม่มี</option><option value="มี">มี</option></select></div>
+      <div class="form-group"><label class="form-label">เทรดเพราะ "ระบบ" หรือ "อารมณ์"</label>
+        <div class="emotion-selector" id="ptjSystemEmo">
+          <button class="emotion-chip" data-val="ระบบ" onclick="selectEmotion(this)">ระบบ</button>
+          <button class="emotion-chip" data-val="อารมณ์" onclick="selectEmotion(this)">อารมณ์</button>
+          <button class="emotion-chip" data-val="ผสม" onclick="selectEmotion(this)">ผสม</button>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">จำนวนเงินผลเทรดวันนี้ (฿)</label><input type="number" id="ptjPnl" class="form-input" placeholder="เช่น 425 หรือ -500"></div>
+      <div class="form-group full"><label class="form-label">&#127775; 1 อย่างที่ทำดีวันนี้</label><textarea id="ptjGood" class="form-textarea"></textarea></div>
+      <div class="form-group full"><label class="form-label">&#9888;&#65039; 1 อย่างที่ต้องปรับปรุง</label><textarea id="ptjImprove" class="form-textarea"></textarea></div>
+      <div class="form-group full"><label class="form-label">&#128172; คำเตือนตัวเองพรุ่งนี้</label><textarea id="ptjReminder" class="form-textarea"></textarea></div>
+    </div>
+    <div class="btn-group"><button class="btn btn-primary" onclick="savePTJ()">&#10003; บันทึกวัดผลสิ้นวัน</button></div>
+  </div>
+</div>
+
+<!-- TAB 3 -->
+<div id="tab-tradelog" class="tab-content">
+  <div class="card">
+    <div class="card-title"><span class="icon">&#128176;</span> เพิ่มธุรกรรม</div>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">วันที่</label><input type="date" id="txDate" class="form-input"></div>
+      <div class="form-group"><label class="form-label">ประเภท</label><select id="txType" class="form-select"><option value="เทรด">เทรด</option><option value="ฝากเข้าพอร์ตลงทุน">ฝากเข้าพอร์ตลงทุน</option><option value="ถอนจากพอร์ตลงทุน">ถอนจากพอร์ตลงทุน</option><option value="โบนัส">โบนัส</option><option value="ค่าธรรมเนียม">ค่าธรรมเนียม</option></select></div>
+      <div class="form-group"><label class="form-label">จำนวนเงิน (฿)</label><input type="number" id="txAmount" class="form-input" placeholder="ขาดทุนใส่เครื่องหมาย -"></div>
+      <div class="form-group"><label class="form-label">ขนาดการลงทุน</label><input type="text" id="txSize" class="form-input" placeholder="เช่น 0.01 lot"></div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="saveTx()" id="btnSaveTx">&#10003; บันทึกธุรกรรม</button>
+      <button class="btn btn-secondary" onclick="cancelEditTx()" id="btnCancelTx" style="display:none">ยกเลิกแก้ไข</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="icon">&#128203;</span> รายการธุรกรรม</div>
+    <div class="filter-bar">
+      <select id="txFilterMonth" class="form-select" onchange="renderTxTable()"><option value="">ทุกเดือน</option><option value="0">ม.ค.</option><option value="1">ก.พ.</option><option value="2">มี.ค.</option><option value="3">เม.ย.</option><option value="4">พ.ค.</option><option value="5">มิ.ย.</option><option value="6">ก.ค.</option><option value="7">ส.ค.</option><option value="8">ก.ย.</option><option value="9">ต.ค.</option><option value="10">พ.ย.</option><option value="11">ธ.ค.</option></select>
+      <select id="txFilterType" class="form-select" onchange="renderTxTable()"><option value="">ทุกประเภท</option><option value="เทรด">เทรด</option><option value="ฝากเข้าพอร์ตลงทุน">ฝากเข้าพอร์ต</option><option value="ถอนจากพอร์ตลงทุน">ถอนจากพอร์ต</option></select>
+    </div>
+    <div class="table-container"><table><thead><tr><th>วันที่</th><th>ประเภท</th><th>จำนวนเงิน</th><th>ขนาด</th><th></th></tr></thead><tbody id="txTable"></tbody></table></div>
+  </div>
+</div>
+
+<!-- TAB 4 -->
+<div id="tab-diary" class="tab-content">
+  <div class="date-nav"><button onclick="changeDiaryDate(-1)">&#8592;</button><input type="date" id="diaryDate" class="form-input" onchange="loadDiary()"><button onclick="changeDiaryDate(1)">&#8594;</button><span class="current-date" id="diaryDayLabel"></span></div>
+  <div class="card">
+    <div class="card-title"><span class="icon">&#128214;</span> บันทึกบทเรียนวันนี้</div>
+    <textarea id="diaryText" class="form-textarea" style="min-height:200px" placeholder="เขียนบทเรียน ความรู้สึก สิ่งที่เรียนรู้จากการเทรดวันนี้..."></textarea>
+    <div class="btn-group"><button class="btn btn-primary" onclick="saveDiary()">&#10003; บันทึก Diary</button></div>
+  </div>
+</div>
+
+<!-- TAB 5 -->
+<div id="tab-dashboard" class="tab-content">
+  <div class="filter-bar">
+    <select id="dashMonth" class="form-select" onchange="renderDashboard()"><option value="">ทุกเดือน</option><option value="0">ม.ค.</option><option value="1">ก.พ.</option><option value="2">มี.ค.</option><option value="3">เม.ย.</option><option value="4">พ.ค.</option><option value="5">มิ.ย.</option><option value="6">ก.ค.</option><option value="7">ส.ค.</option><option value="8">ก.ย.</option><option value="9">ต.ค.</option><option value="10">พ.ย.</option><option value="11">ธ.ค.</option></select>
+    <select id="dashYear" class="form-select" onchange="renderDashboard()"></select>
+  </div>
+  <div style="display:flex;align-items:center;gap:20px;margin-bottom:16px">
+    <img id="dashMascot" class="mascot-img" style="display:none;max-height:130px" alt="">
+    <div style="flex:1"><div class="stat-grid" id="statCards"></div></div>
+  </div>
+  <div class="charts-row">
+    <div class="chart-container"><div class="card-title">Win Rate รายเดือน</div><div class="chart-wrap"><canvas id="chartWinRate"></canvas></div></div>
+    <div class="chart-container"><div class="card-title">P&L รายเดือน</div><div class="chart-wrap"><canvas id="chartPnL"></canvas></div></div>
+  </div>
+  <div class="chart-container"><div class="card-title">Equity Curve</div><div class="chart-wrap"><canvas id="chartEquity"></canvas></div></div>
+  <div class="chart-container"><div class="card-title">ผลเทรดรายวัน</div><div class="chart-wrap"><canvas id="chartDaily"></canvas></div></div>
+</div>
+
+<!-- TAB 6 -->
+<div id="tab-portfolio" class="tab-content">
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
+      <img id="portMascot" class="mascot-img" style="display:none;max-height:80px" alt="">
+      <div class="card-title" style="margin-bottom:0"><span class="icon">&#128034;</span> ตั้งค่าพอร์ตเต่า</div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">ต้นทุน (฿)</label><input type="number" id="portCapital" class="form-input" placeholder="20000"></div>
+      <div class="form-group"><label class="form-label">ขนาดความเสี่ยง (%)</label><input type="number" id="portRisk" class="form-input" placeholder="3" step="0.1"></div>
+      <div class="form-group"><label class="form-label">Stop Loss (ติดลบ % หยุด)</label><input type="number" id="portSL" class="form-input" placeholder="30"></div>
+      <div class="form-group"><label class="form-label">Take Profit (เติบโต %)</label><input type="number" id="portTP" class="form-input" placeholder="50"></div>
+      <div class="form-group"><label class="form-label">TP ต่อวัน (%)</label><input type="number" id="portDayTP" class="form-input" placeholder="5" step="0.1"></div>
+      <div class="form-group"><label class="form-label">SL ต่อวัน (%)</label><input type="number" id="portDaySL" class="form-input" placeholder="6" step="0.1"></div>
+      <div class="form-group"><label class="form-label">จำนวนไม้ต่อวัน (สูงสุด)</label><input type="number" id="portMaxTrades" class="form-input" placeholder="5"></div>
+      <div class="form-group"><label class="form-label">เวลาเทรด (สูงสุด นาที)</label><input type="number" id="portMaxMinutes" class="form-input" placeholder="35"></div>
+      <div class="form-group"><label class="form-label">กำไร — ถอนออก (%)</label><input type="number" id="portWithdraw" class="form-input" placeholder="30"></div>
+      <div class="form-group"><label class="form-label">กำไร — ทบเข้า (%)</label><input type="number" id="portCompound" class="form-input" placeholder="70"></div>
+    </div>
+    <div class="btn-group"><button class="btn btn-primary" onclick="savePortfolio()">&#10003; บันทึกแผนพอร์ต</button></div>
+  </div>
+  <div class="plan-grid" id="portfolioDisplay"></div>
+</div>
+
+<!-- TAB 7 -->
+<div id="tab-history" class="tab-content">
+  <div class="filter-bar">
+    <input type="month" id="historyMonth" class="form-input" onchange="renderHistory()">
+    <select id="historyView" class="form-select" onchange="renderHistory()"><option value="all">ทุกอย่าง</option><option value="trades">เฉพาะไม้</option><option value="ptj">วัดผลสิ้นวัน</option><option value="diary">Diary</option></select>
+  </div>
+  <div id="historyList"></div>
+</div>
+
+</div>
+<!-- AI EXPORT MODAL -->
+<div class="modal-overlay" id="aiExportModal">
+  <div class="modal" style="max-width:520px">
+    <h3 style="display:flex;align-items:center;gap:8px">&#129302; Export ข้อมูลสำหรับ AI วิเคราะห์</h3>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">เลือกช่วงเวลาที่ต้องการ แล้วกดปุ่ม Export เพื่อ copy ข้อความไปวางให้ AI วิเคราะห์</p>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary ai-range-btn active" data-mode="month" onclick="setAIExportMode('month')">&#128197; เดือนเดียว</button>
+        <button class="btn btn-secondary ai-range-btn" data-mode="range" onclick="setAIExportMode('range')">&#8596; ช่วงเวลา</button>
+        <button class="btn btn-secondary ai-range-btn" data-mode="year" onclick="setAIExportMode('year')">&#128198; ทั้งปี</button>
+      </div>
+      <div id="aiModeMonth" class="ai-mode-panel">
+        <div class="form-group"><label class="form-label">เลือกเดือน</label><input type="month" id="aiMonth" class="form-input"></div>
+      </div>
+      <div id="aiModeRange" class="ai-mode-panel" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-group"><label class="form-label">จากเดือน</label><input type="month" id="aiRangeFrom" class="form-input"></div>
+          <div class="form-group"><label class="form-label">ถึงเดือน</label><input type="month" id="aiRangeTo" class="form-input"></div>
+        </div>
+      </div>
+      <div id="aiModeYear" class="ai-mode-panel" style="display:none">
+        <div class="form-group"><label class="form-label">เลือกปี</label><select id="aiYear" class="form-select"></select></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <label style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:4px"><input type="checkbox" id="aiIncTrades" checked> บันทึกไม้</label>
+        <label style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:4px"><input type="checkbox" id="aiIncPTJ" checked> วัดผลสิ้นวัน</label>
+        <label style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:4px"><input type="checkbox" id="aiIncTradelog" checked> Tradelog</label>
+        <label style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:4px"><input type="checkbox" id="aiIncDiary" checked> Diary</label>
+        <label style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:4px"><input type="checkbox" id="aiIncPortfolio" checked> พอร์ตเต่า</label>
+      </div>
+      <div id="aiPreviewStats" style="background:var(--bg-input);border-radius:var(--radius-sm);padding:12px;font-size:13px;color:var(--text-secondary);display:none"></div>
+    </div>
+    <div class="btn-group" style="margin-top:16px">
+      <button class="btn btn-primary" onclick="generateAIExport('copy')">&#128203; Copy ข้อความ</button>
+      <button class="btn btn-secondary" onclick="generateAIExport('file')">&#128190; ดาวน์โหลดไฟล์ .txt</button>
+      <button class="btn btn-secondary" onclick="closeAIExport()">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="detailModal"><div class="modal"><h3 id="modalTitle"></h3><div id="modalBody"></div><div class="btn-group"><button class="btn btn-secondary" onclick="closeModal()">ปิด</button></div></div></div>
+
+<script>
+// === FIREBASE INIT ===
+const firebaseConfig={
+  apiKey:"AIzaSyBcMoXnQXtsQD4irwF3escija8An16N6_w",
+  authDomain:"ironman-trading.firebaseapp.com",
+  projectId:"ironman-trading",
+  storageBucket:"ironman-trading.firebasestorage.app",
+  messagingSenderId:"830678315422",
+  appId:"1:830678315422:web:cfe40415172bf8d681a68f"
+};
+firebase.initializeApp(firebaseConfig);
+const auth=firebase.auth();
+const db=firebase.firestore();
+db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+let currentUser=null;
+let syncTimeout=null;
+
+function setSyncStatus(status,text){
+  const el=document.getElementById('syncStatus');
+  el.className='sync-status '+status;
+  document.getElementById('syncText').textContent=text;
+}
+
+function firebaseLogin(){
+  const provider=new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(err=>{
+    if(err.code==='auth/popup-blocked')auth.signInWithRedirect(provider);
+    else toast('Login ล้มเหลว: '+err.message);
+  });
+}
+
+function firebaseLogout(){
+  if(!confirm('ต้องการออกจากระบบ? ข้อมูลจะยังอยู่ใน Cloud'))return;
+  auth.signOut();
+}
+
+function updateAuthUI(user){
+  const area=document.getElementById('authArea');
+  if(user){
+    area.innerHTML='<img class="auth-avatar" src="'+user.photoURL+'" title="'+user.email+' — คลิกเพื่อออกจากระบบ" onclick="firebaseLogout()" referrerpolicy="no-referrer">';
+    setSyncStatus('online','Cloud Sync');
+  }else{
+    area.innerHTML='<button class="auth-btn" onclick="firebaseLogin()"><svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Login</button>';
+    setSyncStatus('offline','Offline');
+  }
+}
+
+async function loadFromCloud(){
+  if(!currentUser)return;
+  setSyncStatus('syncing','กำลังโหลด...');
+  try{
+    const doc=await db.collection('users').doc(currentUser.uid).get();
+    if(doc.exists&&doc.data().tradingJournal){
+      const cloud=doc.data().tradingJournal;
+      const local=JSON.parse(localStorage.getItem('ironman_trading_journal')||'{}');
+      const localCount=(local.trades||[]).length+(local.postTrade||[]).length+(local.tradelog||[]).length+(local.diary||[]).length;
+      const cloudCount=(cloud.trades||[]).length+(cloud.postTrade||[]).length+(cloud.tradelog||[]).length+(cloud.diary||[]).length;
+      if(localCount>0&&cloudCount>0&&localCount!==cloudCount){
+        if(confirm('พบข้อมูลทั้งใน Cloud ('+cloudCount+' รายการ) และเครื่องนี้ ('+localCount+' รายการ)\n\nกด OK = ใช้ข้อมูล Cloud\nกด Cancel = ใช้ข้อมูลเครื่องนี้แล้ว sync ขึ้น Cloud')){
+          DB=cloud;localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));
+        }else{
+          DB=local;saveToCloud();
+        }
+      }else if(cloudCount>0){
+        DB=cloud;localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));
+      }else if(localCount>0){
+        saveToCloud();
+      }
+    }else{
+      const local=JSON.parse(localStorage.getItem('ironman_trading_journal')||'{}');
+      if((local.trades||[]).length>0)saveToCloud();
+    }
+    setSyncStatus('online','Cloud Sync');
+    location.reload();
+  }catch(e){
+    console.error('Cloud load error:',e);
+    setSyncStatus('offline','Sync Error');
+  }
+}
+
+function saveToCloud(){
+  if(!currentUser)return;
+  if(syncTimeout)clearTimeout(syncTimeout);
+  syncTimeout=setTimeout(()=>{
+    setSyncStatus('syncing','Syncing...');
+    db.collection('users').doc(currentUser.uid).set({
+      tradingJournal:JSON.parse(JSON.stringify(DB)),
+      lastSync:firebase.firestore.FieldValue.serverTimestamp(),
+      email:currentUser.email
+    },{merge:true}).then(()=>{
+      setSyncStatus('online','Cloud Sync');
+    }).catch(err=>{
+      console.error('Cloud save error:',err);
+      setSyncStatus('offline','Sync Error');
+    });
+  },1500);
+}
+
+auth.onAuthStateChanged(user=>{
+  currentUser=user;
+  updateAuthUI(user);
+  if(user)loadFromCloud();
+});
+
+let DB={trades:[],postTrade:[],tradelog:[],diary:[],portfolio:{}};
+let editingTradeId=null, editingTxId=null, charts={};
+
+function loadDB(){try{const r=localStorage.getItem('ironman_trading_journal');if(r)DB=JSON.parse(r)}catch(e){}}
+function saveDB(){localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));saveToCloud()}
+function genId(){return Date.now().toString(36)+Math.random().toString(36).substr(2,5)}
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2500)}
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function formatDate(s){if(!s)return'';const d=new Date(s),m=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return d.getDate()+' '+m[d.getMonth()]+' '+(d.getFullYear()+543)}
+function formatTime24(inp){let v=inp.value.replace(/[^0-9]/g,'');if(v.length>4)v=v.slice(0,4);if(v.length>=3)v=v.slice(0,2)+':'+v.slice(2);inp.value=v}
+function selectEmotion(btn){btn.classList.toggle('selected')}
+function getSelectedEmotions(gid){return Array.from(document.querySelectorAll('#'+gid+' .emotion-chip.selected')).map(c=>c.dataset.val).join(', ')}
+function switchTab(name){document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));document.querySelector('[data-tab="'+name+'"]').classList.add('active');document.getElementById('tab-'+name).classList.add('active');if(name==='dashboard')renderDashboard();if(name==='history')renderHistory();if(name==='portfolio')renderPortfolio()}
+function toggleResultFields(){const r=document.getElementById('tradeResult').value;document.getElementById('winReasonGroup').style.display=r==='TP'?'flex':'none';document.getElementById('loseReasonGroup').style.display=r==='SL'?'flex':'none'}
+
+// === MASCOT ===
+function uploadMascot(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=function(ev){localStorage.setItem('ironman_mascot',ev.target.result);applyMascot(ev.target.result);toast('อัปเดตรูป Mascot สำเร็จ!')};r.readAsDataURL(f);e.target.value=''}
+function applyMascot(url){if(!url)return;
+const h=document.getElementById('headerMascot');const hf=document.getElementById('headerLogoFallback');
+if(h){h.src=url;h.style.display='block'}if(hf)hf.style.display='none';
+const ma=document.getElementById('mascotArea');
+if(ma)ma.innerHTML='<img class="mascot-img" src="'+url+'" alt="IRONMAN TRADER" onclick="document.getElementById(\'mascotUpload\').click()" title="คลิกเปลี่ยนรูป">';
+const di=document.getElementById('dashMascot');if(di){di.src=url;di.style.display='block'}
+const pi=document.getElementById('portMascot');if(pi){pi.src=url;pi.style.display='block'}}
+function loadMascot(){const s=localStorage.getItem('ironman_mascot');if(s)applyMascot(s)}
+
+// === TAB 1: TRADES ===
+function changeTradeDate(d){const inp=document.getElementById('tradeDate');const dt=new Date(inp.value);dt.setDate(dt.getDate()+d);inp.value=dt.toISOString().slice(0,10);loadDayTrades()}
+function loadDayTrades(){
+  const date=document.getElementById('tradeDate').value;
+  document.getElementById('tradeDayLabel').textContent=formatDate(date);
+  const dt=DB.trades.filter(t=>t.date===date).sort((a,b)=>a.tradeNum-b.tradeNum);
+  const w=dt.filter(t=>t.result==='TP').length,l=dt.filter(t=>t.result==='SL').length,tot=dt.filter(t=>t.result!=='-').length;
+  document.getElementById('dayTradeCount').textContent='ไม้ที่ '+dt.length;
+  document.getElementById('dayTradeStats').textContent=tot>0?'ชนะ '+w+' | แพ้ '+l+' | Win Rate '+Math.round(w/tot*100)+'%':dt.length>0?'ยังไม่มีไม้ที่เข้าเทรด':'ยังไม่มีการเทรดวันนี้';
+  const tb=document.getElementById('dayTradesTable');
+  if(!dt.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px">ยังไม่มีบันทึกไม้</td></tr>';return}
+  tb.innerHTML=dt.map(t=>{const rc=t.result==='TP'?'result-tp':t.result==='SL'?'result-sl':t.result==='BE'?'result-be':'result-none';
+  return '<tr><td>'+t.tradeNum+'</td><td>'+(t.time||'-')+'</td><td><span class="result-badge '+rc+'">'+t.result+'</span></td><td>'+(t.pair||'-')+'</td><td>'+(t.place||'-')+'</td><td style="max-width:150px;overflow:hidden;text-overflow:ellipsis">'+(t.emotionBefore||'-')+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">'+(t.reason||'-')+'</td><td><button class="btn btn-sm btn-secondary" onclick="viewTrade(\''+t.id+'\')" title="ดู">&#128065;</button> <button class="btn btn-sm btn-secondary" onclick="editTrade(\''+t.id+'\')" title="แก้ไข" style="color:var(--accent-orange)">&#9998;</button> <button class="btn btn-sm btn-danger" onclick="deleteTrade(\''+t.id+'\')" title="ลบ">&#10005;</button></td></tr>'}).join('')}
+
+function saveTrade(){
+  const date=document.getElementById('tradeDate').value;if(!date){toast('กรุณาเลือกวันที่');return}
+  const ce=document.getElementById('emotionBeforeCustom').value,ch=getSelectedEmotions('emotionBefore');
+  const d={place:document.getElementById('tradePlace').value,time:document.getElementById('tradeTime').value,result:document.getElementById('tradeResult').value,pair:document.getElementById('tradePair').value,emotionBefore:ce||ch||'',reason:document.getElementById('tradeReason').value,winReason:document.getElementById('winReason').value,loseReason:document.getElementById('loseReason').value,emotionAfter:document.getElementById('emotionAfter').value};
+  if(editingTradeId){const i=DB.trades.findIndex(t=>t.id===editingTradeId);if(i>=0){Object.assign(DB.trades[i],d);DB.trades[i].updatedAt=new Date().toISOString()}saveDB();cancelEditTrade();loadDayTrades();toast('แก้ไขไม้สำเร็จ!')}
+  else{const tr={id:genId(),date:date,tradeNum:DB.trades.filter(t=>t.date===date).length+1,...d,createdAt:new Date().toISOString()};DB.trades.push(tr);saveDB();clearTradeForm();loadDayTrades();toast('บันทึกไม้สำเร็จ!')}}
+
+function editTrade(id){const t=DB.trades.find(x=>x.id===id);if(!t)return;editingTradeId=id;
+  document.getElementById('tradePlace').value=t.place||'';document.getElementById('tradeTime').value=t.time||'';document.getElementById('tradeResult').value=t.result||'-';document.getElementById('tradePair').value=t.pair||'';document.getElementById('emotionBeforeCustom').value=t.emotionBefore||'';document.getElementById('tradeReason').value=t.reason||'';document.getElementById('winReason').value=t.winReason||'';document.getElementById('loseReason').value=t.loseReason||'';document.getElementById('emotionAfter').value=t.emotionAfter||'';
+  toggleResultFields();document.querySelectorAll('#emotionBefore .emotion-chip').forEach(c=>c.classList.toggle('selected',t.emotionBefore&&t.emotionBefore.includes(c.dataset.val)));
+  document.getElementById('btnSaveTrade').innerHTML='&#9998; อัปเดตไม้';document.getElementById('btnCancelTrade').textContent='ยกเลิกแก้ไข';document.getElementById('tradeFormTitle').textContent='แก้ไขไม้ #'+t.tradeNum;
+  document.querySelector('#tab-trades .card').scrollIntoView({behavior:'smooth'})}
+
+function cancelEditTrade(){editingTradeId=null;clearTradeForm();document.getElementById('btnSaveTrade').innerHTML='&#10003; บันทึกไม้';document.getElementById('btnCancelTrade').textContent='ล้างฟอร์ม';document.getElementById('tradeFormTitle').textContent='เพิ่มไม้ใหม่'}
+function clearTradeForm(){['tradePlace','tradeTime','tradePair','emotionBeforeCustom','tradeReason','winReason','loseReason','emotionAfter'].forEach(id=>document.getElementById(id).value='');document.getElementById('tradeResult').value='-';document.querySelectorAll('#emotionBefore .emotion-chip').forEach(c=>c.classList.remove('selected'));toggleResultFields()}
+function deleteTrade(id){if(!confirm('ลบไม้นี้?'))return;DB.trades=DB.trades.filter(t=>t.id!==id);const date=document.getElementById('tradeDate').value;DB.trades.filter(t=>t.date===date).sort((a,b)=>a.tradeNum-b.tradeNum).forEach((t,i)=>t.tradeNum=i+1);saveDB();loadDayTrades();toast('ลบสำเร็จ')}
+
+function viewTrade(id){const t=DB.trades.find(x=>x.id===id);if(!t)return;
+  const rc=t.result==='TP'?'color:var(--accent-green)':t.result==='SL'?'color:var(--accent-red)':'';
+  document.getElementById('modalTitle').textContent='ไม้ที่ '+t.tradeNum+' — '+formatDate(t.date);
+  document.getElementById('modalBody').innerHTML='<div style="display:grid;gap:10px"><div class="plan-row"><span>ผลการเทรด</span><span style="'+rc+';font-weight:700">'+t.result+'</span></div><div class="plan-row"><span>คู่เงิน</span><span>'+(t.pair||'-')+'</span></div><div class="plan-row"><span>เวลา</span><span>'+(t.time||'-')+'</span></div><div class="plan-row"><span>สถานที่</span><span>'+(t.place||'-')+'</span></div><div class="plan-row"><span>อารมณ์ก่อนเทรด</span><span>'+(t.emotionBefore||'-')+'</span></div><div style="padding:8px 0;border-bottom:1px solid var(--border)"><div class="form-label" style="margin-bottom:4px">เหตุผลการเข้าออเดอร์</div><div style="font-size:13px;line-height:1.6">'+(t.reason||'-')+'</div></div>'+(t.winReason?'<div style="padding:8px 0;border-bottom:1px solid var(--border);color:var(--accent-green)"><div class="form-label">ชนะเพราะว่า</div><div style="font-size:13px;line-height:1.6">'+t.winReason+'</div></div>':'')+(t.loseReason?'<div style="padding:8px 0;border-bottom:1px solid var(--border);color:var(--accent-red)"><div class="form-label">แพ้เพราะว่า</div><div style="font-size:13px;line-height:1.6">'+t.loseReason+'</div></div>':'')+'<div style="padding:8px 0"><div class="form-label">อารมณ์หลังเทรด</div><div style="font-size:13px;line-height:1.6">'+(t.emotionAfter||'-')+'</div></div></div>';
+  document.getElementById('detailModal').classList.add('show')}
+function closeModal(){document.getElementById('detailModal').classList.remove('show')}
+
+// === TAB 2: PTJ ===
+function changePTJDate(d){const inp=document.getElementById('ptjDate');const dt=new Date(inp.value);dt.setDate(dt.getDate()+d);inp.value=dt.toISOString().slice(0,10);loadPTJ()}
+function loadPTJ(){const date=document.getElementById('ptjDate').value;document.getElementById('ptjDayLabel').textContent=formatDate(date);
+  const dt=DB.trades.filter(t=>t.date===date),w=dt.filter(t=>t.result==='TP').length,tot=dt.filter(t=>t.result!=='-').length;
+  document.getElementById('ptjWinrate').value=tot>0?w+'/'+tot+' ('+Math.round(w/tot*100)+'%)':'ไม่มีการเทรด';
+  const p=DB.postTrade.find(x=>x.date===date);
+  if(p){document.getElementById('ptjForced').value=p.forced||'ไม่มี';document.getElementById('ptjPnl').value=p.pnl||'';document.getElementById('ptjGood').value=p.good||'';document.getElementById('ptjImprove').value=p.improve||'';document.getElementById('ptjReminder').value=p.reminder||'';document.querySelectorAll('#ptjSystemEmo .emotion-chip').forEach(c=>c.classList.toggle('selected',c.dataset.val===p.systemOrEmotion))}
+  else{['ptjPnl','ptjGood','ptjImprove','ptjReminder'].forEach(id=>document.getElementById(id).value='');document.getElementById('ptjForced').value='ไม่มี';document.querySelectorAll('#ptjSystemEmo .emotion-chip').forEach(c=>c.classList.remove('selected'))}}
+function savePTJ(){const date=document.getElementById('ptjDate').value;if(!date)return;
+  const idx=DB.postTrade.findIndex(p=>p.date===date);
+  const p={id:idx>=0?DB.postTrade[idx].id:genId(),date,winrate:document.getElementById('ptjWinrate').value,forced:document.getElementById('ptjForced').value,systemOrEmotion:getSelectedEmotions('ptjSystemEmo'),pnl:parseFloat(document.getElementById('ptjPnl').value)||0,good:document.getElementById('ptjGood').value,improve:document.getElementById('ptjImprove').value,reminder:document.getElementById('ptjReminder').value};
+  if(idx>=0)DB.postTrade[idx]=p;else DB.postTrade.push(p);saveDB();toast('บันทึกวัดผลสิ้นวันสำเร็จ!')}
+
+// === TAB 3: TRADELOG ===
+function saveTx(){const d={date:document.getElementById('txDate').value,type:document.getElementById('txType').value,amount:parseFloat(document.getElementById('txAmount').value)||0,size:document.getElementById('txSize').value};
+  if(!d.date){toast('กรุณาเลือกวันที่');return}
+  if(editingTxId){const i=DB.tradelog.findIndex(t=>t.id===editingTxId);if(i>=0)Object.assign(DB.tradelog[i],d);editingTxId=null;document.getElementById('btnSaveTx').innerHTML='&#10003; บันทึกธุรกรรม';document.getElementById('btnCancelTx').style.display='none';saveDB();renderTxTable();toast('แก้ไขธุรกรรมสำเร็จ!')}
+  else{DB.tradelog.push({id:genId(),...d});saveDB();renderTxTable();toast('บันทึกธุรกรรมสำเร็จ!')}
+  document.getElementById('txAmount').value='';document.getElementById('txSize').value=''}
+function editTx(id){const t=DB.tradelog.find(x=>x.id===id);if(!t)return;editingTxId=id;document.getElementById('txDate').value=t.date||'';document.getElementById('txType').value=t.type||'เทรด';document.getElementById('txAmount').value=t.amount||'';document.getElementById('txSize').value=t.size||'';document.getElementById('btnSaveTx').innerHTML='&#9998; อัปเดตธุรกรรม';document.getElementById('btnCancelTx').style.display='inline-flex';document.querySelector('#tab-tradelog .card').scrollIntoView({behavior:'smooth'})}
+function cancelEditTx(){editingTxId=null;document.getElementById('txAmount').value='';document.getElementById('txSize').value='';document.getElementById('btnSaveTx').innerHTML='&#10003; บันทึกธุรกรรม';document.getElementById('btnCancelTx').style.display='none'}
+function renderTxTable(){const mf=document.getElementById('txFilterMonth').value,tf=document.getElementById('txFilterType').value;
+  let tx=[...DB.tradelog].sort((a,b)=>b.date.localeCompare(a.date));
+  if(mf!=='')tx=tx.filter(t=>new Date(t.date).getMonth()===parseInt(mf));if(tf)tx=tx.filter(t=>t.type===tf);
+  const tb=document.getElementById('txTable');
+  if(!tx.length){tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">ยังไม่มีธุรกรรม</td></tr>';return}
+  tb.innerHTML=tx.map(t=>{const c=t.amount>0?'pnl-pos':t.amount<0?'pnl-neg':'pnl-zero',s=t.amount>0?'+':'';return '<tr><td>'+formatDate(t.date)+'</td><td>'+t.type+'</td><td class="'+c+'">'+s+'฿'+t.amount.toLocaleString()+'</td><td>'+(t.size||'-')+'</td><td><button class="btn btn-sm btn-secondary" onclick="editTx(\''+t.id+'\')" title="แก้ไข" style="color:var(--accent-orange)">&#9998;</button> <button class="btn btn-sm btn-danger" onclick="deleteTx(\''+t.id+'\')" title="ลบ">&#10005;</button></td></tr>'}).join('')}
+function deleteTx(id){if(!confirm('ลบธุรกรรมนี้?'))return;DB.tradelog=DB.tradelog.filter(t=>t.id!==id);saveDB();renderTxTable()}
+
+// === TAB 4: DIARY ===
+function changeDiaryDate(d){const inp=document.getElementById('diaryDate');const dt=new Date(inp.value);dt.setDate(dt.getDate()+d);inp.value=dt.toISOString().slice(0,10);loadDiary()}
+function loadDiary(){const date=document.getElementById('diaryDate').value;document.getElementById('diaryDayLabel').textContent=formatDate(date);const e=DB.diary.find(d=>d.date===date);document.getElementById('diaryText').value=e?e.text:''}
+function saveDiary(){const date=document.getElementById('diaryDate').value,text=document.getElementById('diaryText').value;if(!date)return;const i=DB.diary.findIndex(d=>d.date===date);const e={id:i>=0?DB.diary[i].id:genId(),date,text};if(i>=0)DB.diary[i]=e;else DB.diary.push(e);saveDB();toast('บันทึก Diary สำเร็จ!')}
+
+// === TAB 5: DASHBOARD ===
+function initDashYear(){const s=document.getElementById('dashYear'),y=new Date().getFullYear();for(let i=y;i>=y-5;i--)s.innerHTML+='<option value="'+i+'">'+(i+543)+'</option>'}
+function renderDashboard(){
+  const mf=document.getElementById('dashMonth').value,yr=parseInt(document.getElementById('dashYear').value);
+  const trades=DB.trades.filter(t=>{const d=new Date(t.date);return d.getFullYear()===yr&&(mf===''||d.getMonth()===parseInt(mf))});
+  const ptjs=DB.postTrade.filter(p=>{const d=new Date(p.date);return d.getFullYear()===yr&&(mf===''||d.getMonth()===parseInt(mf))});
+  const tot=trades.filter(t=>t.result!=='-').length,w=trades.filter(t=>t.result==='TP').length,l=trades.filter(t=>t.result==='SL').length,be=trades.filter(t=>t.result==='BE').length,nt=trades.filter(t=>t.result==='-').length;
+  const wr=tot>0?(w/tot*100).toFixed(1):'0';
+  const pnl=ptjs.reduce((s,p)=>s+(p.pnl||0),0)||DB.tradelog.filter(t=>{const d=new Date(t.date);return d.getFullYear()===yr&&(mf===''||d.getMonth()===parseInt(mf))&&t.type==='เทรด'}).reduce((s,t)=>s+t.amount,0);
+  const sd=ptjs.filter(p=>p.systemOrEmotion==='ระบบ').length,td=ptjs.length;
+  document.getElementById('statCards').innerHTML=`
+    <div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-value" style="color:${parseFloat(wr)>=50?'var(--accent-green)':'var(--accent-red)'}">${wr}%</div><div class="stat-sub" style="color:var(--text-muted)">${w}W / ${l}L / ${be}BE</div></div>
+    <div class="stat-card"><div class="stat-label">รวมไม้ทั้งหมด</div><div class="stat-value" style="color:var(--accent-blue)">${tot}</div><div class="stat-sub" style="color:var(--text-muted)">ไม่เทรด ${nt} ครั้ง</div></div>
+    <div class="stat-card"><div class="stat-label">P&L</div><div class="stat-value" style="color:${pnl>=0?'var(--accent-green)':'var(--accent-red)'}">${pnl>=0?'+':''}฿${pnl.toLocaleString()}</div></div>
+    <div class="stat-card"><div class="stat-label">วันเทรด</div><div class="stat-value" style="color:var(--accent-purple)">${td}</div><div class="stat-sub" style="color:var(--text-muted)">ตามระบบ ${sd} วัน</div></div>
+    <div class="stat-card"><div class="stat-label">เฉลี่ย/วัน</div><div class="stat-value" style="color:var(--accent-cyan)">${td>0?(pnl/td).toFixed(0):0}</div><div class="stat-sub" style="color:var(--text-muted)">฿/วัน</div></div>
+    <div class="stat-card"><div class="stat-label">Discipline</div><div class="stat-value" style="color:var(--accent-orange)">${td>0?Math.round(sd/td*100):0}%</div><div class="stat-sub" style="color:var(--text-muted)">เทรดตามระบบ</div></div>`;
+  renderCharts(yr,mf)}
+
+function renderCharts(yr,mf){
+  const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const wrData=mo.map((_,m)=>{const mt=DB.trades.filter(t=>{const d=new Date(t.date);return d.getFullYear()===yr&&d.getMonth()===m&&t.result!=='-'});const w=mt.filter(t=>t.result==='TP').length;return mt.length>0?Math.round(w/mt.length*100):null});
+  const pnlData=mo.map((_,m)=>{const mp=DB.postTrade.filter(p=>{const d=new Date(p.date);return d.getFullYear()===yr&&d.getMonth()===m});return mp.length?mp.reduce((s,p)=>s+(p.pnl||0),0):DB.tradelog.filter(t=>{const d=new Date(t.date);return d.getFullYear()===yr&&d.getMonth()===m&&t.type==='เทรด'}).reduce((s,t)=>s+t.amount,0)});
+  const co={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{color:'#b8afc4'},grid:{color:'rgba(255,255,255,.05)'}},x:{ticks:{color:'#b8afc4'},grid:{display:false}}}};
+  if(charts.wr)charts.wr.destroy();charts.wr=new Chart(document.getElementById('chartWinRate'),{type:'bar',data:{labels:mo,datasets:[{data:wrData,backgroundColor:wrData.map(v=>v!==null?(v>=50?'rgba(14,203,129,.7)':'rgba(246,70,93,.7)'):'transparent'),borderRadius:6}]},options:{...co,scales:{...co.scales,y:{...co.scales.y,min:0,max:100,ticks:{...co.scales.y.ticks,callback:v=>v+'%'}}}}});
+  if(charts.pnl)charts.pnl.destroy();charts.pnl=new Chart(document.getElementById('chartPnL'),{type:'bar',data:{labels:mo,datasets:[{data:pnlData,backgroundColor:pnlData.map(v=>v>=0?'rgba(14,203,129,.7)':'rgba(246,70,93,.7)'),borderRadius:6}]},options:{...co,scales:{...co.scales,y:{...co.scales.y,ticks:{...co.scales.y.ticks,callback:v=>'฿'+v}}}}});
+  // Equity
+  let eq=DB.tradelog.filter(t=>new Date(t.date).getFullYear()===yr).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!eq.length)eq=DB.postTrade.filter(p=>new Date(p.date).getFullYear()===yr).sort((a,b)=>a.date.localeCompare(b.date)).map(p=>({date:p.date,amount:p.pnl||0}));
+  let bal=0;const eqL=[],eqV=[];eq.forEach(t=>{bal+=t.amount;eqL.push(formatDate(t.date));eqV.push(bal)});
+  if(charts.eq)charts.eq.destroy();charts.eq=new Chart(document.getElementById('chartEquity'),{type:'line',data:{labels:eqL,datasets:[{data:eqV,borderColor:'#f97316',backgroundColor:'rgba(249,115,22,.1)',fill:true,tension:.3,pointRadius:2}]},options:{...co,scales:{...co.scales,x:{...co.scales.x,ticks:{...co.scales.x.ticks,maxRotation:45,maxTicksLimit:15}},y:{...co.scales.y,ticks:{...co.scales.y.ticks,callback:v=>'฿'+v}}}}});
+  // Daily
+  let dp=DB.postTrade.filter(p=>{const d=new Date(p.date);return d.getFullYear()===yr&&(mf===''||d.getMonth()===parseInt(mf))}).sort((a,b)=>a.date.localeCompare(b.date));
+  if(charts.dy)charts.dy.destroy();cha
