@@ -431,6 +431,7 @@ const db=firebase.firestore();
 db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
 let currentUser=null;
 let syncTimeout=null;
+let cloudUnsub=null;
 
 function setSyncStatus(status,text){
   const el=document.getElementById('syncStatus');
@@ -462,71 +463,108 @@ function updateAuthUI(user){
   }
 }
 
+function recordCount(o){return (o.trades||[]).length+(o.postTrade||[]).length+(o.tradelog||[]).length+(o.diary||[]).length}
+// รวมสองฝั่งตาม id (ใช้ตอน timestamp เท่ากัน เช่นย้ายระบบครั้งแรก) — ไม่ทำของหายไม่ว่าเปิดเครื่องไหนก่อน
+function mergeUnion(a,b){
+  const out={portfolio:(b.portfolio&&Object.keys(b.portfolio).length)?b.portfolio:(a.portfolio||{})};
+  ['trades','postTrade','tradelog','diary'].forEach(k=>{
+    const m={};(a[k]||[]).forEach(r=>{if(r&&r.id)m[r.id]=r});(b[k]||[]).forEach(r=>{if(r&&r.id)m[r.id]=r});
+    out[k]=Object.values(m);
+  });
+  return out;
+}
+// นำข้อมูลจาก cloud มาใช้ทั้งก้อน แล้ว refresh ทุกหน้า
+function applyCloud(cloud){
+  DB=cloud;
+  localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));
+  document.getElementById('tradeDate').value=today();loadDayTrades();
+  document.getElementById('ptjDate').value=today();loadPTJ();
+  document.getElementById('diaryDate').value=today();loadDiary();
+  initDashYear();loadPortfolio();renderTxTable();renderPnlTracker();loadMascot();
+}
 async function loadFromCloud(){
   if(!currentUser)return;
   setSyncStatus('syncing','กำลังโหลด...');
   try{
     const doc=await db.collection('users').doc(currentUser.uid).get();
-    if(doc.exists&&doc.data().tradingJournal){
-      const cloud=doc.data().tradingJournal;
-      const local=JSON.parse(localStorage.getItem('ironman_trading_journal')||'{}');
-      const localCount=(local.trades||[]).length+(local.postTrade||[]).length+(local.tradelog||[]).length+(local.diary||[]).length;
-      const cloudCount=(cloud.trades||[]).length+(cloud.postTrade||[]).length+(cloud.tradelog||[]).length+(cloud.diary||[]).length;
-      if(localCount>0&&cloudCount>0&&localCount!==cloudCount){
-        if(confirm('พบข้อมูลทั้งใน Cloud ('+cloudCount+' รายการ) และเครื่องนี้ ('+localCount+' รายการ)\n\nกด OK = ใช้ข้อมูล Cloud\nกด Cancel = ใช้ข้อมูลเครื่องนี้แล้ว sync ขึ้น Cloud')){
-          DB=cloud;localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));
-        }else{
-          DB=local;saveToCloud();
-        }
-      }else if(cloudCount>0){
-        DB=cloud;localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));
-      }else if(localCount>0){
-        saveToCloud();
+    const local=JSON.parse(localStorage.getItem('ironman_trading_journal')||'{}');
+    const cloud=(doc.exists&&doc.data().tradingJournal)?doc.data().tradingJournal:null;
+    if(cloud){
+      const lt=local.updatedAt||0, ct=cloud.updatedAt||0;
+      // ตัดสินด้วยเวลาแก้ล่าสุด (last-write-wins); ข้อมูลเก่าที่ยังไม่มี timestamp(ts=0) ให้ union กันของหาย
+      if(lt===0&&recordCount(local)>0){
+        const merged=mergeUnion(cloud,local);merged.updatedAt=Math.max(ct,Date.now());
+        applyCloud(merged);writeToCloud();
+      }else if(ct>lt){
+        applyCloud(cloud);
+      }else if(lt>ct){
+        DB=local;localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));writeToCloud();
+      }else{
+        const merged=mergeUnion(cloud,local);merged.updatedAt=Date.now();
+        applyCloud(merged);writeToCloud();
       }
-    }else{
-      const local=JSON.parse(localStorage.getItem('ironman_trading_journal')||'{}');
-      if((local.trades||[]).length>0)saveToCloud();
+    }else if(recordCount(local)>0){
+      DB=local;if(!DB.updatedAt)DB.updatedAt=Date.now();
+      localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));writeToCloud();
     }
     setSyncStatus('online','Cloud Sync');
-    document.getElementById('tradeDate').value=today();loadDayTrades();
-    document.getElementById('ptjDate').value=today();loadPTJ();
-    document.getElementById('diaryDate').value=today();loadDiary();
-    initDashYear();loadPortfolio();renderTxTable();loadMascot();
   }catch(e){
     console.error('Cloud load error:',e);
     setSyncStatus('offline','Sync Error');
   }
 }
 
+function writeToCloud(){
+  if(!currentUser)return Promise.resolve();
+  setSyncStatus('syncing','Syncing...');
+  return db.collection('users').doc(currentUser.uid).set({
+    tradingJournal:JSON.parse(JSON.stringify(DB)),
+    lastSync:firebase.firestore.FieldValue.serverTimestamp(),
+    email:currentUser.email
+  },{merge:true}).then(()=>{
+    setSyncStatus('online','Cloud Sync');
+  }).catch(err=>{
+    console.error('Cloud save error:',err);
+    setSyncStatus('offline','Sync Error');
+  });
+}
 function saveToCloud(){
   if(!currentUser)return;
   if(syncTimeout)clearTimeout(syncTimeout);
-  syncTimeout=setTimeout(()=>{
-    setSyncStatus('syncing','Syncing...');
-    db.collection('users').doc(currentUser.uid).set({
-      tradingJournal:JSON.parse(JSON.stringify(DB)),
-      lastSync:firebase.firestore.FieldValue.serverTimestamp(),
-      email:currentUser.email
-    },{merge:true}).then(()=>{
-      setSyncStatus('online','Cloud Sync');
-    }).catch(err=>{
-      console.error('Cloud save error:',err);
-      setSyncStatus('offline','Sync Error');
-    });
-  },1500);
+  syncTimeout=setTimeout(()=>{syncTimeout=null;writeToCloud();},1500);
+}
+// เขียนขึ้น cloud ทันทีที่ค้างอยู่ (ใช้ตอนกำลังปิด/สลับแท็บ กัน save ไม่ทัน)
+function flushToCloud(){
+  if(!currentUser||!syncTimeout)return;
+  clearTimeout(syncTimeout);syncTimeout=null;
+  writeToCloud();
 }
 
 auth.onAuthStateChanged(user=>{
   currentUser=user;
   updateAuthUI(user);
-  if(user)loadFromCloud();
+  if(cloudUnsub){cloudUnsub();cloudUnsub=null;}
+  if(user){
+    loadFromCloud().then(()=>{
+      // ฟังการเปลี่ยนแปลงแบบ realtime — เปิดค้างไว้ก็อัพเดทสดจากอีกเครื่อง
+      cloudUnsub=db.collection('users').doc(user.uid).onSnapshot(snap=>{
+        if(snap.metadata.hasPendingWrites||!snap.exists)return;
+        const cloud=snap.data().tradingJournal;
+        if(cloud&&(cloud.updatedAt||0)>(DB.updatedAt||0)){
+          applyCloud(cloud);
+          setSyncStatus('online','Cloud Sync');
+          toast('ซิงค์ข้อมูลใหม่จาก Cloud แล้ว');
+        }
+      },err=>console.error('Snapshot error:',err));
+    });
+  }
 });
 
 let DB={trades:[],postTrade:[],tradelog:[],diary:[],portfolio:{}};
 let editingTradeId=null, editingTxId=null, charts={};
 
 function loadDB(){try{const r=localStorage.getItem('ironman_trading_journal');if(r){const d=JSON.parse(r);DB.trades=d.trades||[];DB.postTrade=d.postTrade||[];DB.tradelog=d.tradelog||[];DB.diary=d.diary||[];DB.portfolio=d.portfolio||{}}}catch(e){}}
-function saveDB(){localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));saveToCloud()}
+function saveDB(){DB.updatedAt=Date.now();localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));saveToCloud()}
 function genId(){return Date.now().toString(36)+Math.random().toString(36).substr(2,5)}
 function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2500)}
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -992,6 +1030,9 @@ window.addEventListener('load',function(){
   document.getElementById('detailModal').addEventListener('click',function(e){if(e.target===this)closeModal()});
   document.getElementById('aiExportModal').addEventListener('click',function(e){if(e.target===this)closeAIExport()});
   ['aiMonth','aiRangeFrom','aiRangeTo','aiYear'].forEach(id=>{document.getElementById(id).addEventListener('change',previewAIStats)});
+  // บังคับ save ขึ้น cloud ก่อนปิด/สลับแท็บ กันข้อมูลค้างไม่ทันขึ้น
+  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')flushToCloud()});
+  window.addEventListener('pagehide',flushToCloud);
 });
 </script>
 </body>
