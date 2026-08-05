@@ -591,6 +591,14 @@ const di=document.getElementById('dashMascot');if(di){di.src=url;di.style.displa
 const pi=document.getElementById('portMascot');if(pi){pi.src=url;pi.style.display='block'}}
 function loadMascot(){const s=localStorage.getItem('ironman_mascot');if(s)applyMascot(s)}
 
+// The day's real trades: an order went out and came back +, - or break-even.
+// Rows logged while waiting for a setup that never arrived are kept in the
+// journal but are not trades, so they must not take up one of the tracker's
+// five slots. renderPnlTracker and onPnlPctChange have to agree on this list —
+// the tracker's columns are indexes into it, and editing a column writes back
+// through the same index.
+function executedTrades(date){return DB.trades.filter(t=>t.date===date&&t.result&&t.result!=='-').sort((a,b)=>a.tradeNum-b.tradeNum)}
+
 // === TAB 1: TRADES ===
 function changeTradeDate(d){const inp=document.getElementById('tradeDate');const dt=new Date(inp.value);dt.setDate(dt.getDate()+d);inp.value=dt.toISOString().slice(0,10);loadDayTrades()}
 
@@ -603,7 +611,7 @@ function renderPnlTracker(){
   const lotSize=cap*(riskPct/100);
   const tpAmt=cap*(tpPct/100),slAmt=cap*(slPct/100);
   const date=document.getElementById('tradeDate').value;
-  const dt=DB.trades.filter(t=>t.date===date).sort((a,b)=>a.tradeNum-b.tradeNum);
+  const dt=executedTrades(date);
   // Build 5-column data
   let vals=[];
   for(let i=0;i<5;i++){
@@ -676,7 +684,7 @@ function onPnlPctChange(idx){
   const pnlAmt=lotSize*(pctVal/100);
   // Update the trade's PNL if it exists
   const date=document.getElementById('tradeDate').value;
-  const dt=DB.trades.filter(t=>t.date===date).sort((a,b)=>a.tradeNum-b.tradeNum);
+  const dt=executedTrades(date);
   if(dt[idx]){dt[idx].pnl=Math.round(pnlAmt);saveDB()}
   // Recalculate all display values
   let tots=[];
