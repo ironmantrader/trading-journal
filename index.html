@@ -291,8 +291,8 @@ tr:hover td{background:var(--bg-hover)}
   <div class="card">
     <div class="card-title"><span class="icon">&#128176;</span> เพิ่มธุรกรรม</div>
     <div class="form-grid">
-      <div class="form-group"><label class="form-label">วันที่</label><input type="date" id="txDate" class="form-input"></div>
-      <div class="form-group"><label class="form-label">ประเภท</label><select id="txType" class="form-select"><option value="เทรด">เทรด</option><option value="ฝากเข้าพอร์ตลงทุน">ฝากเข้าพอร์ตลงทุน</option><option value="ถอนจากพอร์ตลงทุน">ถอนจากพอร์ตลงทุน</option><option value="โบนัส">โบนัส</option><option value="ค่าธรรมเนียม">ค่าธรรมเนียม</option></select></div>
+      <div class="form-group"><label class="form-label">วันที่</label><input type="date" id="txDate" class="form-input" onchange="refreshTxAuto()"></div>
+      <div class="form-group"><label class="form-label">ประเภท</label><select id="txType" class="form-select" onchange="refreshTxAuto()"><option value="เทรด">เทรด</option><option value="ฝากเข้าพอร์ตลงทุน">ฝากเข้าพอร์ตลงทุน</option><option value="ถอนจากพอร์ตลงทุน">ถอนจากพอร์ตลงทุน</option><option value="โบนัส">โบนัส</option><option value="ค่าธรรมเนียม">ค่าธรรมเนียม</option></select></div>
       <div class="form-group"><label class="form-label">จำนวนเงิน (฿)</label><input type="number" id="txAmount" class="form-input" placeholder="ขาดทุนใส่เครื่องหมาย -"></div>
       <div class="form-group"><label class="form-label">ขนาดการลงทุน</label><input type="text" id="txSize" class="form-input" placeholder="เช่น 0.01 lot"></div>
     </div>
@@ -480,7 +480,12 @@ function applyCloud(cloud){
   document.getElementById('tradeDate').value=today();loadDayTrades();
   document.getElementById('ptjDate').value=today();loadPTJ();
   document.getElementById('diaryDate').value=today();loadDiary();
-  initDashYear();loadPortfolio();renderTxTable();renderPnlTracker();loadMascot();
+  initDashYear();loadPortfolio();renderTxTable();refreshTxAuto();renderPnlTracker();loadMascot();
+  // Dashboard and History are only drawn on tab entry, so a snapshot arriving
+  // from another device would sit unseen behind whichever one is open.
+  const act=document.querySelector('.tab-content.active');
+  if(act&&act.id==='tab-dashboard')renderDashboard();
+  if(act&&act.id==='tab-history')renderHistory();
 }
 async function loadFromCloud(){
   if(!currentUser)return;
@@ -572,7 +577,7 @@ function formatDate(s){if(!s)return'';const d=new Date(s),m=['ม.ค.','ก.พ
 function formatTime24(inp){let v=inp.value.replace(/[^0-9]/g,'');if(v.length>4)v=v.slice(0,4);if(v.length>=3)v=v.slice(0,2)+':'+v.slice(2);inp.value=v}
 function selectEmotion(btn){btn.classList.toggle('selected')}
 function getSelectedEmotions(gid){return Array.from(document.querySelectorAll('#'+gid+' .emotion-chip.selected')).map(c=>c.dataset.val).join(', ')}
-function switchTab(name){document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));document.querySelector('[data-tab="'+name+'"]').classList.add('active');document.getElementById('tab-'+name).classList.add('active');if(name==='dashboard')renderDashboard();if(name==='history')renderHistory();if(name==='portfolio')renderPortfolio()}
+function switchTab(name){document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));document.querySelector('[data-tab="'+name+'"]').classList.add('active');document.getElementById('tab-'+name).classList.add('active');if(name==='dashboard')renderDashboard();if(name==='history')renderHistory();if(name==='portfolio')renderPortfolio();if(name==='postTrade')refreshPTJAuto();if(name==='tradelog')refreshTxAuto()}
 function toggleResultFields(){const r=document.getElementById('tradeResult').value;document.getElementById('winReasonGroup').style.display=r==='TP'?'flex':'none';document.getElementById('loseReasonGroup').style.display=r==='SL'?'flex':'none';document.getElementById('tradePnlGroup').style.display=r!=='-'?'flex':'none'}
 
 // === MASCOT ===
@@ -739,32 +744,57 @@ function closeModal(){document.getElementById('detailModal').classList.remove('s
 
 // === TAB 2: PTJ ===
 function changePTJDate(d){const inp=document.getElementById('ptjDate');const dt=new Date(inp.value);dt.setDate(dt.getDate()+d);inp.value=dt.toISOString().slice(0,10);loadPTJ()}
-function loadPTJ(){const date=document.getElementById('ptjDate').value;document.getElementById('ptjDayLabel').textContent=formatDate(date);
+// Winrate and the day's PNL both come from the trades logged that day, so they
+// go stale while the user is over on the trades tab. Refreshed on their own so
+// re-entering this tab does not wipe form text that has not been saved yet.
+// The PNL is filled in as a starting point only: never over a saved entry, and
+// never over a number the user typed — ptjAutoPnl is what we last put there, so
+// a field still holding it is ours to update.
+let ptjAutoPnl=null;
+function refreshPTJAuto(){const date=document.getElementById('ptjDate').value;
   const dt=DB.trades.filter(t=>t.date===date),w=dt.filter(t=>t.result==='TP').length,tot=dt.filter(t=>t.result!=='-').length;
   document.getElementById('ptjWinrate').value=tot>0?w+'/'+tot+' ('+Math.round(w/tot*100)+'%)':'ไม่มีการเทรด';
+  const el=document.getElementById('ptjPnl');
+  if(DB.postTrade.some(x=>x.date===date))return;
+  if(el.value!==''&&el.value!==String(ptjAutoPnl))return;
+  ptjAutoPnl=dt.length?dt.reduce((s,t)=>s+(t.pnl||0),0):null;
+  el.value=ptjAutoPnl===null?'':ptjAutoPnl}
+function loadPTJ(){const date=document.getElementById('ptjDate').value;document.getElementById('ptjDayLabel').textContent=formatDate(date);
   const p=DB.postTrade.find(x=>x.date===date);
   if(p){document.getElementById('ptjForced').value=p.forced||'ไม่มี';document.getElementById('ptjPnl').value=p.pnl||'';document.getElementById('ptjGood').value=p.good||'';document.getElementById('ptjImprove').value=p.improve||'';document.getElementById('ptjReminder').value=p.reminder||'';document.querySelectorAll('#ptjSystemEmo .emotion-chip').forEach(c=>c.classList.toggle('selected',c.dataset.val===p.systemOrEmotion))}
-  else{['ptjPnl','ptjGood','ptjImprove','ptjReminder'].forEach(id=>document.getElementById(id).value='');document.getElementById('ptjForced').value='ไม่มี';document.querySelectorAll('#ptjSystemEmo .emotion-chip').forEach(c=>c.classList.remove('selected'))}}
+  else{['ptjPnl','ptjGood','ptjImprove','ptjReminder'].forEach(id=>document.getElementById(id).value='');document.getElementById('ptjForced').value='ไม่มี';document.querySelectorAll('#ptjSystemEmo .emotion-chip').forEach(c=>c.classList.remove('selected'))}
+  ptjAutoPnl=null;refreshPTJAuto()}
 function savePTJ(){const date=document.getElementById('ptjDate').value;if(!date)return;
   const idx=DB.postTrade.findIndex(p=>p.date===date);
   const p={id:idx>=0?DB.postTrade[idx].id:genId(),date,winrate:document.getElementById('ptjWinrate').value,forced:document.getElementById('ptjForced').value,systemOrEmotion:getSelectedEmotions('ptjSystemEmo'),pnl:parseFloat(document.getElementById('ptjPnl').value)||0,good:document.getElementById('ptjGood').value,improve:document.getElementById('ptjImprove').value,reminder:document.getElementById('ptjReminder').value};
   if(idx>=0)DB.postTrade[idx]=p;else DB.postTrade.push(p);saveDB();toast('บันทึกวัดผลสิ้นวันสำเร็จ!')}
 
 // === TAB 3: TRADELOG ===
+// A 'เทรด' transaction is just the day's trades added up, so offer the number
+// ready-made and let the user confirm it. Same rules as the post-trade PNL:
+// never while editing an existing row, never over a number the user typed, and
+// never once that day already has a เทรด row.
+let txAutoAmount=null;
+function refreshTxAuto(){const el=document.getElementById('txAmount'),date=document.getElementById('txDate').value;
+  if(editingTxId)return;
+  if(el.value!==''&&el.value!==String(txAutoAmount))return;
+  const dt=(document.getElementById('txType').value==='เทรด'&&date&&!DB.tradelog.some(t=>t.date===date&&t.type==='เทรด'))?DB.trades.filter(t=>t.date===date):[];
+  txAutoAmount=dt.length?dt.reduce((s,t)=>s+(t.pnl||0),0):null;
+  el.value=txAutoAmount===null?'':txAutoAmount}
 function saveTx(){const d={date:document.getElementById('txDate').value,type:document.getElementById('txType').value,amount:parseFloat(document.getElementById('txAmount').value)||0,size:document.getElementById('txSize').value};
   if(!d.date){toast('กรุณาเลือกวันที่');return}
   if(editingTxId){const i=DB.tradelog.findIndex(t=>t.id===editingTxId);if(i>=0)Object.assign(DB.tradelog[i],d);editingTxId=null;document.getElementById('btnSaveTx').innerHTML='&#10003; บันทึกธุรกรรม';document.getElementById('btnCancelTx').style.display='none';saveDB();renderTxTable();toast('แก้ไขธุรกรรมสำเร็จ!')}
   else{DB.tradelog.push({id:genId(),...d});saveDB();renderTxTable();toast('บันทึกธุรกรรมสำเร็จ!')}
-  document.getElementById('txAmount').value='';document.getElementById('txSize').value=''}
+  document.getElementById('txAmount').value='';document.getElementById('txSize').value='';refreshTxAuto()}
 function editTx(id){const t=DB.tradelog.find(x=>x.id===id);if(!t)return;editingTxId=id;document.getElementById('txDate').value=t.date||'';document.getElementById('txType').value=t.type||'เทรด';document.getElementById('txAmount').value=t.amount||'';document.getElementById('txSize').value=t.size||'';document.getElementById('btnSaveTx').innerHTML='&#9998; อัปเดตธุรกรรม';document.getElementById('btnCancelTx').style.display='inline-flex';document.querySelector('#tab-tradelog .card').scrollIntoView({behavior:'smooth'})}
-function cancelEditTx(){editingTxId=null;document.getElementById('txAmount').value='';document.getElementById('txSize').value='';document.getElementById('btnSaveTx').innerHTML='&#10003; บันทึกธุรกรรม';document.getElementById('btnCancelTx').style.display='none'}
+function cancelEditTx(){editingTxId=null;document.getElementById('txAmount').value='';document.getElementById('txSize').value='';document.getElementById('btnSaveTx').innerHTML='&#10003; บันทึกธุรกรรม';document.getElementById('btnCancelTx').style.display='none';refreshTxAuto()}
 function renderTxTable(){const mf=document.getElementById('txFilterMonth').value,tf=document.getElementById('txFilterType').value;
   let tx=[...DB.tradelog].sort((a,b)=>b.date.localeCompare(a.date));
   if(mf!=='')tx=tx.filter(t=>new Date(t.date).getMonth()===parseInt(mf));if(tf)tx=tx.filter(t=>t.type===tf);
   const tb=document.getElementById('txTable');
   if(!tx.length){tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">ยังไม่มีธุรกรรม</td></tr>';return}
   tb.innerHTML=tx.map(t=>{const c=t.amount>0?'pnl-pos':t.amount<0?'pnl-neg':'pnl-zero',s=t.amount>0?'+':'';return '<tr><td>'+formatDate(t.date)+'</td><td>'+t.type+'</td><td class="'+c+'">'+s+'฿'+t.amount.toLocaleString()+'</td><td>'+(t.size||'-')+'</td><td><button class="btn btn-sm btn-secondary" onclick="editTx(\''+t.id+'\')" title="แก้ไข" style="color:var(--accent-orange)">&#9998;</button> <button class="btn btn-sm btn-danger" onclick="deleteTx(\''+t.id+'\')" title="ลบ">&#10005;</button></td></tr>'}).join('')}
-function deleteTx(id){if(!confirm('ลบธุรกรรมนี้?'))return;DB.tradelog=DB.tradelog.filter(t=>t.id!==id);saveDB();renderTxTable()}
+function deleteTx(id){if(!confirm('ลบธุรกรรมนี้?'))return;DB.tradelog=DB.tradelog.filter(t=>t.id!==id);saveDB();renderTxTable();refreshTxAuto()}
 
 // === TAB 4: DIARY ===
 function changeDiaryDate(d){const inp=document.getElementById('diaryDate');const dt=new Date(inp.value);dt.setDate(dt.getDate()+d);inp.value=dt.toISOString().slice(0,10);loadDiary()}
@@ -1017,7 +1047,7 @@ window.addEventListener('load',function(){
   loadDB();
   document.getElementById('tradeDate').value=today();loadDayTrades();
   document.getElementById('ptjDate').value=today();loadPTJ();
-  document.getElementById('txDate').value=today();
+  document.getElementById('txDate').value=today();refreshTxAuto();
   document.getElementById('diaryDate').value=today();loadDiary();
   initDashYear();loadPortfolio();renderTxTable();toggleResultFields();loadMascot();renderPnlTracker();
   document.getElementById('historyMonth').value=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
