@@ -463,14 +463,45 @@ function updateAuthUI(user){
   }
 }
 
-function recordCount(o){return (o.trades||[]).length+(o.postTrade||[]).length+(o.tradelog||[]).length+(o.diary||[]).length}
-// รวมสองฝั่งตาม id (ใช้ตอน timestamp เท่ากัน เช่นย้ายระบบครั้งแรก) — ไม่ทำของหายไม่ว่าเปิดเครื่องไหนก่อน
-function mergeUnion(a,b){
-  const out={portfolio:(b.portfolio&&Object.keys(b.portfolio).length)?b.portfolio:(a.portfolio||{})};
-  ['trades','postTrade','tradelog','diary'].forEach(k=>{
-    const m={};(a[k]||[]).forEach(r=>{if(r&&r.id)m[r.id]=r});(b[k]||[]).forEach(r=>{if(r&&r.id)m[r.id]=r});
-    out[k]=Object.values(m);
+const LISTS=['trades','postTrade','tradelog','diary'];
+function recordCount(o){return LISTS.reduce((n,k)=>n+(o[k]||[]).length,0)}
+// ลายเซ็นของรายการหนึ่ง ๆ ไม่นับ ut — ใช้ดูว่าเนื้อหาเปลี่ยนจริงไหม
+function recSig(r){return JSON.stringify(Object.keys(r).filter(k=>k!=='ut').sort().map(k=>[k,r[k]]))}
+function dataSig(o){return JSON.stringify([LISTS.map(k=>(o[k]||[]).map(r=>r.id+'|'+(r.ut||0)+'|'+recSig(r)).sort()),o.portfolio||{},o.deleted||{}])}
+// เทียบ DB ปัจจุบันกับที่เซฟไว้ครั้งก่อน แล้วประทับ ut เฉพาะรายการที่เปลี่ยน + จดรายการที่หายไปเป็น tombstone
+function stampChanges(prev){
+  const now=Date.now();
+  LISTS.forEach(k=>{
+    const old={};(prev[k]||[]).forEach(r=>{if(r&&r.id)old[r.id]=r});
+    (DB[k]||[]).forEach(r=>{
+      if(!r||!r.id)return;
+      const o=old[r.id];
+      if(!o||recSig(o)!==recSig(r))r.ut=now;
+      delete old[r.id];
+    });
+    Object.keys(old).forEach(id=>{DB.deleted=DB.deleted||{};DB.deleted[id]=now});
   });
+  if(JSON.stringify(prev.portfolio||{})!==JSON.stringify(DB.portfolio||{}))DB.portfolioTs=now;
+}
+// รวมสองฝั่งทีละรายการ (union by id, ut ใหม่กว่าชนะ, tombstone ตัดของที่ลบไปแล้ว) — b ชนะเมื่อ ut เท่ากัน
+function mergeDB(a,b){
+  const tomb={};
+  [a.deleted||{},b.deleted||{}].forEach(d=>Object.keys(d).forEach(id=>{if(!(tomb[id]>=d[id]))tomb[id]=d[id]}));
+  const out={deleted:tomb};
+  LISTS.forEach(k=>{
+    const m={};
+    [a[k]||[],b[k]||[]].forEach(list=>list.forEach(r=>{
+      if(!r||!r.id)return;
+      const cur=m[r.id];
+      if(!cur||(r.ut||0)>=(cur.ut||0))m[r.id]=r;
+    }));
+    out[k]=Object.values(m).filter(r=>!(tomb[r.id]>(r.ut||0)));
+  });
+  const at=a.portfolioTs||0,bt=b.portfolioTs||0;
+  if(bt>at)out.portfolio=b.portfolio||{};
+  else if(at>bt)out.portfolio=a.portfolio||{};
+  else out.portfolio=(b.portfolio&&Object.keys(b.portfolio).length)?b.portfolio:(a.portfolio||{});
+  out.portfolioTs=Math.max(at,bt);
   return out;
 }
 // นำข้อมูลจาก cloud มาใช้ทั้งก้อน แล้ว refresh ทุกหน้า
@@ -495,19 +526,11 @@ async function loadFromCloud(){
     const local=JSON.parse(localStorage.getItem('ironman_trading_journal')||'{}');
     const cloud=(doc.exists&&doc.data().tradingJournal)?doc.data().tradingJournal:null;
     if(cloud){
-      const lt=local.updatedAt||0, ct=cloud.updatedAt||0;
-      // ตัดสินด้วยเวลาแก้ล่าสุด (last-write-wins); ข้อมูลเก่าที่ยังไม่มี timestamp(ts=0) ให้ union กันของหาย
-      if(lt===0&&recordCount(local)>0){
-        const merged=mergeUnion(cloud,local);merged.updatedAt=Math.max(ct,Date.now());
-        applyCloud(merged);writeToCloud();
-      }else if(ct>lt){
-        applyCloud(cloud);
-      }else if(lt>ct){
-        DB=local;localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));writeToCloud();
-      }else{
-        const merged=mergeUnion(cloud,local);merged.updatedAt=Date.now();
-        applyCloud(merged);writeToCloud();
-      }
+      // รวมทีละรายการเสมอ ไม่ทับทั้งก้อน — เปิดเครื่องไหนก่อนก็ได้ข้อมูลครบเท่ากัน
+      const merged=mergeDB(cloud,local);
+      merged.updatedAt=Math.max(cloud.updatedAt||0,local.updatedAt||0,Date.now());
+      applyCloud(merged);
+      if(dataSig(merged)!==dataSig(cloud))writeToCloud();
     }else if(recordCount(local)>0){
       DB=local;if(!DB.updatedAt)DB.updatedAt=Date.now();
       localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));writeToCloud();
@@ -555,11 +578,14 @@ auth.onAuthStateChanged(user=>{
       cloudUnsub=db.collection('users').doc(user.uid).onSnapshot(snap=>{
         if(snap.metadata.hasPendingWrites||!snap.exists)return;
         const cloud=snap.data().tradingJournal;
-        if(cloud&&(cloud.updatedAt||0)>(DB.updatedAt||0)){
-          applyCloud(cloud);
-          setSyncStatus('online','Cloud Sync');
-          toast('ซิงค์ข้อมูลใหม่จาก Cloud แล้ว');
-        }
+        if(!cloud)return;
+        const merged=mergeDB(cloud,DB);
+        if(dataSig(merged)===dataSig(DB))return; // ไม่มีอะไรใหม่จากอีกเครื่อง
+        merged.updatedAt=Math.max(cloud.updatedAt||0,DB.updatedAt||0);
+        applyCloud(merged);
+        setSyncStatus('online','Cloud Sync');
+        toast('ซิงค์ข้อมูลใหม่จาก Cloud แล้ว');
+        if(dataSig(merged)!==dataSig(cloud))writeToCloud();
       },err=>console.error('Snapshot error:',err));
     });
   }
@@ -568,8 +594,8 @@ auth.onAuthStateChanged(user=>{
 let DB={trades:[],postTrade:[],tradelog:[],diary:[],portfolio:{}};
 let editingTradeId=null, editingTxId=null, charts={};
 
-function loadDB(){try{const r=localStorage.getItem('ironman_trading_journal');if(r){const d=JSON.parse(r);DB.trades=d.trades||[];DB.postTrade=d.postTrade||[];DB.tradelog=d.tradelog||[];DB.diary=d.diary||[];DB.portfolio=d.portfolio||{}}}catch(e){}}
-function saveDB(){DB.updatedAt=Date.now();localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));saveToCloud()}
+function loadDB(){try{const r=localStorage.getItem('ironman_trading_journal');if(r){const d=JSON.parse(r);DB.trades=d.trades||[];DB.postTrade=d.postTrade||[];DB.tradelog=d.tradelog||[];DB.diary=d.diary||[];DB.portfolio=d.portfolio||{};DB.deleted=d.deleted||{};DB.portfolioTs=d.portfolioTs||0;DB.updatedAt=d.updatedAt||0}}catch(e){}}
+function saveDB(){let prev={};try{prev=JSON.parse(localStorage.getItem('ironman_trading_journal')||'{}')}catch(e){}stampChanges(prev);DB.updatedAt=Date.now();localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));saveToCloud()}
 function genId(){return Date.now().toString(36)+Math.random().toString(36).substr(2,5)}
 function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2500)}
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -872,7 +898,7 @@ function viewDayDetail(date){const dt=DB.trades.filter(t=>t.date===date).sort((a
 
 // === EXPORT/IMPORT ===
 function exportData(){const b=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='trading-journal-backup-'+today()+'.json';a.click();URL.revokeObjectURL(u);toast('Export สำเร็จ!')}
-function importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=function(ev){try{const imp=JSON.parse(ev.target.result);if(confirm('ต้องการรวมข้อมูลกับข้อมูลเดิม? (กด Cancel เพื่อแทนที่ทั้งหมด)')){if(imp.trades)DB.trades=[...DB.trades,...imp.trades];if(imp.postTrade)DB.postTrade=[...DB.postTrade,...imp.postTrade];if(imp.tradelog)DB.tradelog=[...DB.tradelog,...imp.tradelog];if(imp.diary)DB.diary=[...DB.diary,...imp.diary];if(imp.portfolio)DB.portfolio=imp.portfolio}else DB=imp;saveDB();location.reload()}catch(err){alert('ไฟล์ไม่ถูกต้อง: '+err.message)}};r.readAsText(f);e.target.value=''}
+function importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=function(ev){try{const imp=JSON.parse(ev.target.result);if(confirm('ต้องการรวมข้อมูลกับข้อมูลเดิม? (กด Cancel เพื่อแทนที่ทั้งหมด)')){const m=mergeDB(DB,imp);m.updatedAt=DB.updatedAt||0;DB=m}else DB=imp;saveDB();location.reload()}catch(err){alert('ไฟล์ไม่ถูกต้อง: '+err.message)}};r.readAsText(f);e.target.value=''}
 
 // === AI EXPORT ===
 let aiExportMode='month';
