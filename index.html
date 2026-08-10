@@ -470,7 +470,10 @@ function recSig(r){return JSON.stringify(Object.keys(r).filter(k=>k!=='ut').sort
 function dataSig(o){return JSON.stringify([LISTS.map(k=>(o[k]||[]).map(r=>r.id+'|'+(r.ut||0)+'|'+recSig(r)).sort()),o.portfolio||{},o.deleted||{}])}
 // เทียบ DB ปัจจุบันกับที่เซฟไว้ครั้งก่อน แล้วประทับ ut เฉพาะรายการที่เปลี่ยน + จดรายการที่หายไปเป็น tombstone
 function stampChanges(prev){
-  const now=Date.now();
+  // ต้องมากกว่าทุก ut ที่เคยเห็น (รวมของอีกเครื่องที่ merge เข้ามา) — กันนาฬิกาสองเครื่องเดินไม่ตรงกันแล้วแก้ทีหลังกลับแพ้
+  let now=Date.now();
+  LISTS.forEach(k=>(DB[k]||[]).forEach(r=>{if(r&&r.ut>=now)now=r.ut+1}));
+  Object.keys(DB.deleted||{}).forEach(id=>{if(DB.deleted[id]>=now)now=DB.deleted[id]+1});
   LISTS.forEach(k=>{
     const old={};(prev[k]||[]).forEach(r=>{if(r&&r.id)old[r.id]=r});
     (DB[k]||[]).forEach(r=>{
