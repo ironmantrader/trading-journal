@@ -117,5 +117,44 @@ console.log('\n5) เครื่องใหม่ที่ยังไม่�
   check('ได้ portfolio มาด้วย', fresh.local.portfolio.capital === 1000);
 }
 
+console.log('\n6) รูป Mascot ต้องตามไปอีกเครื่อง และตัวที่เปลี่ยนทีหลังต้องชนะ');
+{
+  const cloud = { doc: { trades: [], postTrade: [], tradelog: [], diary: [], portfolio: {}, deleted: {}, updatedAt: 0 } };
+  const mac = Device('mac', 0), pc = Device('pc', 0);
+  mac.save(d => { d.mascot = 'data:image/webp;base64,AAAA'; });
+  mac.sync(cloud); pc.sync(cloud);
+  check('PC ได้รูปจาก Mac', pc.local.mascot === 'data:image/webp;base64,AAAA', 'ได้ ' + pc.local.mascot);
+  check('การเปลี่ยนรูปทำให้ลายเซ็นต่างจริง', ctx.dataSig({ mascotTs: 1 }) !== ctx.dataSig({ mascotTs: 2 }));
+  pc.save(d => { d.mascot = 'data:image/webp;base64,BBBB'; });
+  pc.sync(cloud); mac.sync(cloud);
+  check('รูปที่เปลี่ยนทีหลังชนะทั้งสองเครื่อง', mac.local.mascot === 'data:image/webp;base64,BBBB' && pc.local.mascot === mac.local.mascot,
+    'mac=' + mac.local.mascot);
+}
+
+console.log('\n7) ไม่มีรูปเลย ต้องไม่กลายเป็น undefined (Firestore เขียน undefined ไม่ได้)');
+{
+  const cloud = { doc: { trades: [{ id: 'A', ut: 1 }], postTrade: [], tradelog: [], diary: [], portfolio: {}, deleted: {}, updatedAt: 1 } };
+  const mac = Device('mac', 0);
+  const merged = mac.sync(cloud);
+  check('mascot เป็น string เสมอ', typeof merged.mascot === 'string', 'ได้ ' + typeof merged.mascot);
+  check('ไม่มี undefined หลงอยู่ในก้อนที่จะเขียนขึ้น cloud',
+    !JSON.stringify(Object.entries(merged).map(([k, v]) => [k, v === undefined])).includes('true'));
+}
+
+console.log('\n8) แก้แผน Portfolio รัว ๆ จากเครื่องที่นาฬิกาช้ากว่า ของใหม่ต้องไม่แพ้ของเก่า');
+{
+  const cloud = { doc: { trades: [], postTrade: [], tradelog: [], diary: [], portfolio: {}, deleted: {}, updatedAt: 0 } };
+  const mac = Device('mac', 0), pc = Device('pc', -180000);
+  mac.save(d => { d.portfolio = { capital: 1000, risk: 1 }; });
+  mac.sync(cloud); pc.sync(cloud);
+  pc.save(d => { d.portfolio = { capital: 2000, risk: 2 }; }); // นาฬิกาช้ากว่า 3 นาที
+  pc.sync(cloud); mac.sync(cloud);
+  check('แผนที่แก้ทีหลังชนะทั้งสองเครื่อง', mac.local.portfolio.capital === 2000 && pc.local.portfolio.capital === 2000,
+    'mac=' + JSON.stringify(mac.local.portfolio) + ' pc=' + JSON.stringify(pc.local.portfolio));
+  const t1 = mac.local.portfolioTs;
+  mac.save(d => { d.portfolio = { capital: 3000, risk: 3 }; }); // แก้ซ้ำในมิลลิวินาทีเดียวกัน
+  check('แก้ซ้ำติดกันได้ ts ที่เดินหน้าเสมอ', mac.local.portfolioTs > t1, t1 + ' -> ' + mac.local.portfolioTs);
+}
+
 console.log('\n' + (fail ? 'FAILED ' + fail + ' / ' + (pass + fail) : 'ผ่านหมด ' + pass + ' ข้อ'));
 process.exit(fail ? 1 : 0);

@@ -500,13 +500,18 @@ const LISTS=['trades','postTrade','tradelog','diary'];
 function recordCount(o){return LISTS.reduce((n,k)=>n+(o[k]||[]).length,0)}
 // ลายเซ็นของรายการหนึ่ง ๆ ไม่นับ ut — ใช้ดูว่าเนื้อหาเปลี่ยนจริงไหม
 function recSig(r){return JSON.stringify(Object.keys(r).filter(k=>k!=='ut').sort().map(k=>[k,r[k]]))}
-function dataSig(o){return JSON.stringify([LISTS.map(k=>(o[k]||[]).map(r=>r.id+'|'+(r.ut||0)+'|'+recSig(r)).sort()),o.portfolio||{},o.deleted||{}])}
+// mascot เทียบด้วย ts ไม่ใช่ตัว base64 — ลายเซ็นนี้ถูกคำนวณทุกครั้งที่ snapshot เข้ามา
+function dataSig(o){return JSON.stringify([LISTS.map(k=>(o[k]||[]).map(r=>r.id+'|'+(r.ut||0)+'|'+recSig(r)).sort()),o.portfolio||{},o.deleted||{},o.mascotTs||0])}
 // เทียบ DB ปัจจุบันกับที่เซฟไว้ครั้งก่อน แล้วประทับ ut เฉพาะรายการที่เปลี่ยน + จดรายการที่หายไปเป็น tombstone
 function stampChanges(prev){
   // ต้องมากกว่าทุก ut ที่เคยเห็น (รวมของอีกเครื่องที่ merge เข้ามา) — กันนาฬิกาสองเครื่องเดินไม่ตรงกันแล้วแก้ทีหลังกลับแพ้
   let now=Date.now();
   LISTS.forEach(k=>(DB[k]||[]).forEach(r=>{if(r&&r.ut>=now)now=r.ut+1}));
   Object.keys(DB.deleted||{}).forEach(id=>{if(DB.deleted[id]>=now)now=DB.deleted[id]+1});
+  // portfolioTs กับ mascotTs ถูกลืมไว้นอกลูปนี้ตั้งแต่แรก ทั้งที่แข่งกันด้วยกติกาเดียวกับ ut
+  // แก้แผนสองครั้งรวดในมิลลิวินาทีเดียว หรือแก้จากเครื่องที่นาฬิกาช้ากว่า แล้วของใหม่แพ้ของเก่า
+  if((DB.portfolioTs||0)>=now)now=DB.portfolioTs+1;
+  if((DB.mascotTs||0)>=now)now=DB.mascotTs+1;
   LISTS.forEach(k=>{
     const old={};(prev[k]||[]).forEach(r=>{if(r&&r.id)old[r.id]=r});
     (DB[k]||[]).forEach(r=>{
@@ -518,6 +523,7 @@ function stampChanges(prev){
     Object.keys(old).forEach(id=>{DB.deleted=DB.deleted||{};DB.deleted[id]=now});
   });
   if(JSON.stringify(prev.portfolio||{})!==JSON.stringify(DB.portfolio||{}))DB.portfolioTs=now;
+  if((prev.mascot||'')!==(DB.mascot||''))DB.mascotTs=now;
 }
 // รวมสองฝั่งทีละรายการ (union by id, ut ใหม่กว่าชนะ, tombstone ตัดของที่ลบไปแล้ว) — b ชนะเมื่อ ut เท่ากัน
 function mergeDB(a,b){
@@ -538,6 +544,9 @@ function mergeDB(a,b){
   else if(at>bt)out.portfolio=a.portfolio||{};
   else out.portfolio=(b.portfolio&&Object.keys(b.portfolio).length)?b.portfolio:(a.portfolio||{});
   out.portfolioTs=Math.max(at,bt);
+  const am=a.mascotTs||0,bm=b.mascotTs||0;
+  out.mascot=(bm>am?b.mascot:am>bm?a.mascot:(b.mascot||a.mascot))||'';
+  out.mascotTs=Math.max(am,bm);
   return out;
 }
 // นำข้อมูลจาก cloud มาใช้ทั้งก้อน แล้ว refresh ทุกหน้า
@@ -655,8 +664,21 @@ window.addEventListener('online',resyncOnReturn);
 let DB={trades:[],postTrade:[],tradelog:[],diary:[],portfolio:{}};
 let editingTradeId=null, editingTxId=null, charts={};
 
-function loadDB(){try{const r=localStorage.getItem('ironman_trading_journal');if(r){const d=JSON.parse(r);DB.trades=d.trades||[];DB.postTrade=d.postTrade||[];DB.tradelog=d.tradelog||[];DB.diary=d.diary||[];DB.portfolio=d.portfolio||{};DB.deleted=d.deleted||{};DB.portfolioTs=d.portfolioTs||0;DB.updatedAt=d.updatedAt||0}}catch(e){}}
-function saveDB(){let prev={};try{prev=JSON.parse(localStorage.getItem('ironman_trading_journal')||'{}')}catch(e){}stampChanges(prev);DB.updatedAt=Date.now();localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));saveToCloud()}
+function loadDB(){try{const r=localStorage.getItem('ironman_trading_journal');if(r){const d=JSON.parse(r);DB.trades=d.trades||[];DB.postTrade=d.postTrade||[];DB.tradelog=d.tradelog||[];DB.diary=d.diary||[];DB.portfolio=d.portfolio||{};DB.deleted=d.deleted||{};DB.portfolioTs=d.portfolioTs||0;DB.mascot=d.mascot||'';DB.mascotTs=d.mascotTs||0;DB.updatedAt=d.updatedAt||0}}catch(e){}}
+function saveDB(){
+  let prev={};try{prev=JSON.parse(localStorage.getItem('ironman_trading_journal')||'{}')}catch(e){}
+  stampChanges(prev);DB.updatedAt=Date.now();
+  // setItem โยน QuotaExceededError ได้เมื่อพื้นที่เต็ม ถ้าปล่อยให้ throw ทะลุออกไป
+  // saveToCloud() ข้างล่างจะไม่ถูกเรียกเลย รายการที่เพิ่งบันทึกจึงไม่ไปถึงทั้งเครื่องและ cloud
+  // ทั้งที่ DB ในหน่วยความจำยังมีอยู่ หน้าจอเลยแสดงว่าสำเร็จจนกว่าจะรีเฟรชแล้วค่อยพบว่าหาย
+  try{localStorage.setItem('ironman_trading_journal',JSON.stringify(DB))}
+  catch(e){
+    console.error('Local save error:',e);
+    toast('พื้นที่ในเครื่องเต็ม — บันทึกขึ้น Cloud อย่างเดียว');
+    setSyncStatus('warn','เครื่องเต็ม','เซฟลงเครื่องไม่ได้ ข้อมูลพึ่ง Cloud อย่างเดียว — ลบรูป Mascot หรือล้าง cache ช่วยได้');
+  }
+  saveToCloud();
+}
 function genId(){return Date.now().toString(36)+Math.random().toString(36).substr(2,5)}
 function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2500)}
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -668,7 +690,36 @@ function switchTab(name){document.querySelectorAll('.tab-btn').forEach(b=>b.clas
 function toggleResultFields(){const r=document.getElementById('tradeResult').value;document.getElementById('winReasonGroup').style.display=r==='TP'?'flex':'none';document.getElementById('loseReasonGroup').style.display=r==='SL'?'flex':'none';document.getElementById('tradePnlGroup').style.display=r!=='-'?'flex':'none'}
 
 // === MASCOT ===
-function uploadMascot(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=function(ev){localStorage.setItem('ironman_mascot',ev.target.result);applyMascot(ev.target.result);toast('อัปเดตรูป Mascot สำเร็จ!')};r.readAsDataURL(f);e.target.value=''}
+// รูปดิบจากมือถือเป็นหลักเมกะไบต์ ซึ่งทั้งกินโควตา localStorage ที่ใช้ร่วมกับสมุดบันทึก
+// และกินเพดาน 1 MiB ของ Firestore document ย่อก่อนเก็บเสมอ
+function shrinkImage(src,cb){
+  const img=new Image();
+  img.onload=function(){
+    const MAX=256,s=Math.min(1,MAX/Math.max(img.width,img.height));
+    const c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(img.width*s));c.height=Math.max(1,Math.round(img.height*s));
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    let url='';
+    try{url=c.toDataURL('image/webp',0.9)}catch(err){}
+    if(url.indexOf('data:image/webp')!==0)url=c.toDataURL('image/png');
+    cb(url);
+  };
+  img.onerror=function(){cb('')};
+  img.src=src;
+}
+function uploadMascot(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=function(ev){
+    shrinkImage(ev.target.result,function(url){
+      if(!url){toast('อ่านไฟล์รูปไม่ได้');return}
+      // เก็บใน DB ไม่ใช่ localStorage ลอย ๆ รูปจะได้ตามไปเครื่องอื่นและติดไปกับไฟล์ Export ด้วย
+      DB.mascot=url;saveDB();applyMascot(url);
+      toast('อัปเดตรูป Mascot สำเร็จ!');
+    });
+  };
+  r.readAsDataURL(f);e.target.value='';
+}
 function applyMascot(url){if(!url)return;
 const h=document.getElementById('headerMascot');const hf=document.getElementById('headerLogoFallback');
 if(h){h.src=url;h.style.display='block'}if(hf)hf.style.display='none';
@@ -676,7 +727,17 @@ const ma=document.getElementById('mascotArea');
 if(ma)ma.innerHTML='<img class="mascot-img" src="'+url+'" alt="IRONMAN TRADER" onclick="document.getElementById(\'mascotUpload\').click()" title="คลิกเปลี่ยนรูป">';
 const di=document.getElementById('dashMascot');if(di){di.src=url;di.style.display='block'}
 const pi=document.getElementById('portMascot');if(pi){pi.src=url;pi.style.display='block'}}
-function loadMascot(){const s=localStorage.getItem('ironman_mascot');if(s)applyMascot(s)}
+function loadMascot(){
+  if(DB.mascot){applyMascot(DB.mascot);return}
+  // ของเดิมอยู่ใน localStorage ล้วน จึงไม่เคยไปโผล่อีกเครื่องเลย — ย้ายเข้า DB ครั้งเดียวตอนเปิด
+  const old=localStorage.getItem('ironman_mascot');
+  if(!old)return;
+  applyMascot(old);
+  shrinkImage(old,function(url){
+    if(url){DB.mascot=url;saveDB();applyMascot(url)}
+    localStorage.removeItem('ironman_mascot');
+  });
+}
 
 // The day's real trades: an order went out and came back +, - or break-even.
 // Rows logged while waiting for a setup that never arrived are kept in the
