@@ -144,6 +144,9 @@ tr:hover td{background:var(--bg-hover)}
 .sync-status.online{color:var(--accent-green)}
 .sync-status.syncing{color:var(--accent-orange)}
 .sync-status.offline{color:var(--text-muted)}
+.sync-status.warn{color:var(--accent-orange)}
+.sync-status.error{color:var(--accent-red);background:var(--accent-red-dim)}
+.sync-status{cursor:pointer}
 .sync-dot{width:8px;height:8px;border-radius:50%;background:currentColor}
 .sync-status.syncing .sync-dot{animation:pulse 1s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
@@ -182,7 +185,7 @@ tr:hover td{background:var(--bg-hover)}
     <button class="btn-icon" onclick="exportData()">Export JSON</button>
     <button class="btn-icon" onclick="document.getElementById('importFile').click()">Import</button>
     <input type="file" id="importFile" class="hidden-input" accept=".json">
-    <div id="syncStatus" class="sync-status offline"><span class="sync-dot"></span><span id="syncText">Offline</span></div>
+    <div id="syncStatus" class="sync-status offline" onclick="forceSync()" title="คลิกเพื่อซิงค์เดี๋ยวนี้"><span class="sync-dot"></span><span id="syncText">Offline</span></div>
     <div id="authArea"><button class="auth-btn" onclick="firebaseLogin()"><svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Login</button></div>
   </div>
 </div>
@@ -432,11 +435,40 @@ db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
 let currentUser=null;
 let syncTimeout=null;
 let cloudUnsub=null;
+let retryTimeout=null;   // ตัวจับเวลาลองเขียนใหม่
+let retryDelay=0;        // backoff ปัจจุบัน (ms)
+let pendingWrite=false;  // มีของแก้ไว้ที่ยังไปไม่ถึง cloud
 
-function setSyncStatus(status,text){
+function setSyncStatus(status,text,detail){
   const el=document.getElementById('syncStatus');
   el.className='sync-status '+status;
+  el.title=detail||'คลิกเพื่อซิงค์เดี๋ยวนี้';
   document.getElementById('syncText').textContent=text;
+}
+// แปลง error ของ Firestore เป็นสิ่งที่คนอ่านแล้วรู้ว่าต้องทำอะไรต่อ
+function syncErrText(err){
+  const c=(err&&err.code)||'';
+  if(c==='permission-denied')return 'Cloud ปฏิเสธ — กฎ users/{uid} ไม่อนุญาต';
+  if(c==='unauthenticated')return 'Login หมดอายุ — คลิกรูปโปรไฟล์เพื่อเข้าใหม่';
+  return 'ต่อ Cloud ไม่ได้ — '+(c||(err&&err.message)||'ไม่ทราบสาเหตุ');
+}
+// เขียนไม่ผ่านแล้วปล่อยเงียบ ๆ คือทางที่ข้อมูลสองเครื่องแยกจากกัน — ลองใหม่จนกว่าจะขึ้นจริง
+function scheduleRetry(){
+  if(retryTimeout)return;
+  retryDelay=Math.min(retryDelay?retryDelay*2:5000,300000);
+  retryTimeout=setTimeout(()=>{
+    retryTimeout=null;
+    if(!currentUser)return;
+    // อ่านใหม่ก่อนเขียนเสมอ เผื่ออีกเครื่องขยับไปแล้วระหว่างที่เราต่อไม่ติด
+    loadFromCloud().then(()=>{if(pendingWrite)writeToCloud()});
+  },retryDelay);
+}
+// ปุ่มกดเองตอนสงสัยว่าสองเครื่องไม่ตรงกัน: ดึงของบน cloud มารวม แล้วดันของเราขึ้นไป
+function forceSync(){
+  if(!currentUser){firebaseLogin();return}
+  if(retryTimeout){clearTimeout(retryTimeout);retryTimeout=null}
+  retryDelay=0;
+  loadFromCloud().then(()=>{if(pendingWrite)writeToCloud()});
 }
 
 function firebaseLogin(){
@@ -459,7 +491,8 @@ function updateAuthUI(user){
     setSyncStatus('online','Cloud Sync');
   }else{
     area.innerHTML='<button class="auth-btn" onclick="firebaseLogin()"><svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Login</button>';
-    setSyncStatus('offline','Offline');
+    // เทาจาง ๆ ว่า "Offline" อ่านเหมือนแอพปกติ ทั้งที่แปลว่าที่จดวันนี้จะไม่ไปไหนเลย
+    setSyncStatus('warn','ยังไม่ได้ Login','ข้อมูลจะอยู่แค่เครื่องนี้จนกว่าจะ Login');
   }
 }
 
@@ -532,16 +565,21 @@ async function loadFromCloud(){
       // รวมทีละรายการเสมอ ไม่ทับทั้งก้อน — เปิดเครื่องไหนก่อนก็ได้ข้อมูลครบเท่ากัน
       const merged=mergeDB(cloud,local);
       merged.updatedAt=Math.max(cloud.updatedAt||0,local.updatedAt||0,Date.now());
-      applyCloud(merged);
+      // applyCloud รีเซ็ตช่องวันที่กลับเป็นวันนี้ — ตอนนี้ loadFromCloud ถูกเรียกทุกครั้งที่กลับมาที่แท็บ
+      // ถ้าวาดใหม่ทั้งที่ไม่มีอะไรเปลี่ยน คนที่กำลังดูวันย้อนหลังจะโดนดีดกลับมาวันนี้เอง
+      if(dataSig(merged)!==dataSig(DB))applyCloud(merged);
+      else{DB=merged;localStorage.setItem('ironman_trading_journal',JSON.stringify(DB))}
       if(dataSig(merged)!==dataSig(cloud))writeToCloud();
+      else pendingWrite=false; // cloud มีของเราครบแล้ว ไม่มีอะไรค้าง
     }else if(recordCount(local)>0){
       DB=local;if(!DB.updatedAt)DB.updatedAt=Date.now();
       localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));writeToCloud();
-    }
-    setSyncStatus('online','Cloud Sync');
+    }else pendingWrite=false;
+    if(!pendingWrite)setSyncStatus('online','Cloud Sync');
   }catch(e){
     console.error('Cloud load error:',e);
-    setSyncStatus('offline','Sync Error');
+    setSyncStatus('error','อ่าน Cloud ไม่ได้',syncErrText(e));
+    scheduleRetry();
   }
 }
 
@@ -553,14 +591,19 @@ function writeToCloud(){
     lastSync:firebase.firestore.FieldValue.serverTimestamp(),
     email:currentUser.email
   },{merge:true}).then(()=>{
+    pendingWrite=false;retryDelay=0;
+    if(retryTimeout){clearTimeout(retryTimeout);retryTimeout=null}
     setSyncStatus('online','Cloud Sync');
   }).catch(err=>{
     console.error('Cloud save error:',err);
-    setSyncStatus('offline','Sync Error');
+    pendingWrite=true;
+    setSyncStatus('error','ยังไม่ขึ้น Cloud',syncErrText(err));
+    scheduleRetry();
   });
 }
 function saveToCloud(){
   if(!currentUser)return;
+  pendingWrite=true;
   if(syncTimeout)clearTimeout(syncTimeout);
   syncTimeout=setTimeout(()=>{syncTimeout=null;writeToCloud();},1500);
 }
@@ -571,28 +614,43 @@ function flushToCloud(){
   writeToCloud();
 }
 
+// ฟังการเปลี่ยนแปลงแบบ realtime — เปิดค้างไว้ก็อัพเดทสดจากอีกเครื่อง
+function subscribeCloud(uid){
+  if(cloudUnsub){cloudUnsub();cloudUnsub=null;}
+  cloudUnsub=db.collection('users').doc(uid).onSnapshot(snap=>{
+    if(snap.metadata.hasPendingWrites||!snap.exists)return;
+    const cloud=snap.data().tradingJournal;
+    if(!cloud)return;
+    const merged=mergeDB(cloud,DB);
+    if(dataSig(merged)===dataSig(DB))return; // ไม่มีอะไรใหม่จากอีกเครื่อง
+    merged.updatedAt=Math.max(cloud.updatedAt||0,DB.updatedAt||0);
+    applyCloud(merged);
+    setSyncStatus('online','Cloud Sync');
+    toast('ซิงค์ข้อมูลใหม่จาก Cloud แล้ว');
+    if(dataSig(merged)!==dataSig(cloud))writeToCloud();
+  },err=>{
+    // listener ตายแล้วไม่ต่อใหม่ = เครื่องนี้จะไม่เห็นอะไรจากอีกเครื่องอีกเลย ทั้งที่ยังดูปกติ
+    console.error('Snapshot error:',err);
+    cloudUnsub=null;
+    setSyncStatus('error','ขาดจาก Cloud',syncErrText(err));
+    scheduleRetry();
+  });
+}
+
 auth.onAuthStateChanged(user=>{
   currentUser=user;
   updateAuthUI(user);
   if(cloudUnsub){cloudUnsub();cloudUnsub=null;}
-  if(user){
-    loadFromCloud().then(()=>{
-      // ฟังการเปลี่ยนแปลงแบบ realtime — เปิดค้างไว้ก็อัพเดทสดจากอีกเครื่อง
-      cloudUnsub=db.collection('users').doc(user.uid).onSnapshot(snap=>{
-        if(snap.metadata.hasPendingWrites||!snap.exists)return;
-        const cloud=snap.data().tradingJournal;
-        if(!cloud)return;
-        const merged=mergeDB(cloud,DB);
-        if(dataSig(merged)===dataSig(DB))return; // ไม่มีอะไรใหม่จากอีกเครื่อง
-        merged.updatedAt=Math.max(cloud.updatedAt||0,DB.updatedAt||0);
-        applyCloud(merged);
-        setSyncStatus('online','Cloud Sync');
-        toast('ซิงค์ข้อมูลใหม่จาก Cloud แล้ว');
-        if(dataSig(merged)!==dataSig(cloud))writeToCloud();
-      },err=>console.error('Snapshot error:',err));
-    });
-  }
+  if(user)loadFromCloud().then(()=>subscribeCloud(user.uid));
 });
+
+// กลับมาที่แท็บ / เน็ตกลับมา คือจังหวะที่อีกเครื่องอาจแก้อะไรไปแล้ว และ listener อาจหลุดไปตอนเครื่องหลับ
+function resyncOnReturn(){
+  if(!currentUser)return;
+  if(!cloudUnsub)subscribeCloud(currentUser.uid);
+  loadFromCloud().then(()=>{if(pendingWrite)writeToCloud()});
+}
+window.addEventListener('online',resyncOnReturn);
 
 let DB={trades:[],postTrade:[],tradelog:[],diary:[],portfolio:{}};
 let editingTradeId=null, editingTxId=null, charts={};
@@ -1098,7 +1156,10 @@ window.addEventListener('load',function(){
   document.getElementById('aiExportModal').addEventListener('click',function(e){if(e.target===this)closeAIExport()});
   ['aiMonth','aiRangeFrom','aiRangeTo','aiYear'].forEach(id=>{document.getElementById(id).addEventListener('change',previewAIStats)});
   // บังคับ save ขึ้น cloud ก่อนปิด/สลับแท็บ กันข้อมูลค้างไม่ทันขึ้น
-  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')flushToCloud()});
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='hidden')flushToCloud();
+    else resyncOnReturn();
+  });
   window.addEventListener('pagehide',flushToCloud);
 });
 </script>
