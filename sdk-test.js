@@ -2,7 +2,7 @@
 // เทียบ main กับ branch ทีละตัวด้วยไฟล์เดียวกันทุกอย่างยกเว้นเวอร์ชัน SDK
 const http = require('http'), { execSync } = require('child_process'), puppeteer = require('puppeteer');
 
-const REPO = require('os').homedir() + '/trading-journal';
+const REPO = __dirname;
 const targets = [
   { name: 'main', ref: 'main' },
   { name: 'HEAD', ref: 'HEAD' },
