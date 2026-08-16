@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IRONMAN Trading Journal</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.17.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.17.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore-compat.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap');
 :root {
@@ -432,7 +432,10 @@ const firebaseConfig={
 firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth();
 const db=firebase.firestore();
-db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+// enablePersistence ถูกประกาศเลิกใช้แล้วและจะหายไปสักเวอร์ชัน ถ้าวันนั้นมันหายไปเฉย ๆ
+// บรรทัดนี้จะโยน TypeError กลางสคริปต์ระดับบนสุด แล้วทุกอย่างใต้บรรทัดนี้ก็ไม่ถูกประกาศเลย
+// แอพจะขาวทั้งหน้าเพราะแคชออฟไลน์ ซึ่งไม่มีก็ยังใช้งานได้
+try{if(db.enablePersistence)db.enablePersistence({synchronizeTabs:true}).catch(()=>{})}catch(e){console.warn('persistence unavailable',e)}
 let currentUser=null;
 let syncTimeout=null;
 let cloudUnsub=null;
