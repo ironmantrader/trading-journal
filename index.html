@@ -690,10 +690,12 @@ async function openBackups(){
   try{
     const all=await backupsRef().get();
     const rows=all.docs.map(d=>({id:d.id,n:recordCount(d.data().tradingJournal||{})})).sort((a,b)=>b.id.localeCompare(a.id));
-    body.innerHTML=rows.length
+    const kb=Math.round(dbBytes()/1024),pct=Math.round(dbBytes()/DOC_LIMIT*100);
+    const meter='<p style="font-size:12px;color:'+(pct>=70?'var(--accent-orange)':'var(--text-muted)')+';margin-bottom:10px">ขนาดข้อมูลตอนนี้ '+kb+' KB จากเพดาน 1024 KB ('+pct+'%)</p>';
+    body.innerHTML=meter+(rows.length
       ?'<p style="color:var(--text-muted);font-size:13px;margin-bottom:8px">รวมสำเนากลับเข้าข้อมูลปัจจุบัน — ของที่จดใหม่กว่าจะไม่ถูกทับ</p>'+
        rows.map(r=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border-color)"><span>'+r.id+' &middot; '+r.n+' รายการ</span><button class="btn btn-secondary" onclick="restoreBackup(\''+r.id+'\')">กู้คืน</button></div>').join('')
-      :'<p style="color:var(--text-muted)">ยังไม่มีสำเนา — สำเนาแรกจะถูกเก็บอัตโนมัติเมื่อเปิดแอพครั้งต่อไป</p>';
+      :'<p style="color:var(--text-muted)">ยังไม่มีสำเนา — สำเนาแรกจะถูกเก็บอัตโนมัติเมื่อเปิดแอพครั้งต่อไป</p>');
   }catch(e){body.innerHTML='<p style="color:var(--accent-red)">โหลดสำเนาไม่ได้: '+(e.code||e.message)+'</p>'}
 }
 async function restoreBackup(day){
@@ -726,13 +728,29 @@ let DB={trades:[],postTrade:[],tradelog:[],diary:[],portfolio:{}};
 let editingTradeId=null, editingTxId=null, charts={};
 
 function loadDB(){try{const r=localStorage.getItem('ironman_trading_journal');if(r){const d=JSON.parse(r);DB.trades=d.trades||[];DB.postTrade=d.postTrade||[];DB.tradelog=d.tradelog||[];DB.diary=d.diary||[];DB.portfolio=d.portfolio||{};DB.deleted=d.deleted||{};DB.portfolioTs=d.portfolioTs||0;DB.mascot=d.mascot||'';DB.mascotTs=d.mascotTs||0;DB.updatedAt=d.updatedAt||0}}catch(e){}}
+// Firestore ตัดที่ 1 MiB ต่อ document และทั้งสมุดอยู่ใน document เดียว
+// พอชนเพดาน การเขียนจะ fail พร้อมกันทั้งหมด ไม่ใช่ค่อย ๆ ช้าลง จึงต้องรู้ตัวก่อนถึงวันนั้น
+const DOC_LIMIT=1048576,DOC_WARN=Math.round(DOC_LIMIT*0.7);
+let sizeWarned=false;
+function dbBytes(json){return new TextEncoder().encode(json===undefined?JSON.stringify(DB):json).length}
+function checkSize(json){
+  if(json.length<DOC_WARN/3)return;  // ภาษาไทยกินสูงสุด 3 ไบต์ต่อตัว ต่ำกว่านี้ไม่มีทางถึงเกณฑ์
+  const b=dbBytes(json);
+  if(b<DOC_WARN||sizeWarned)return;
+  sizeWarned=true;
+  console.warn('Journal size',b,'/',DOC_LIMIT);
+  toast('ข้อมูลโตถึง '+Math.round(b/1024)+'KB จากเพดาน 1024KB');
+  setSyncStatus('warn','ใกล้เต็ม','Firestore จำกัด 1 MiB ต่อเอกสาร พอชนเพดานจะเขียนไม่ได้ทั้งหมด — ถึงเวลาแยกข้อมูลตามปี');
+}
 function saveDB(){
   let prev={};try{prev=JSON.parse(localStorage.getItem('ironman_trading_journal')||'{}')}catch(e){}
   stampChanges(prev);DB.updatedAt=Date.now();
+  const json=JSON.stringify(DB);
+  checkSize(json);
   // setItem โยน QuotaExceededError ได้เมื่อพื้นที่เต็ม ถ้าปล่อยให้ throw ทะลุออกไป
   // saveToCloud() ข้างล่างจะไม่ถูกเรียกเลย รายการที่เพิ่งบันทึกจึงไม่ไปถึงทั้งเครื่องและ cloud
   // ทั้งที่ DB ในหน่วยความจำยังมีอยู่ หน้าจอเลยแสดงว่าสำเร็จจนกว่าจะรีเฟรชแล้วค่อยพบว่าหาย
-  try{localStorage.setItem('ironman_trading_journal',JSON.stringify(DB))}
+  try{localStorage.setItem('ironman_trading_journal',json)}
   catch(e){
     console.error('Local save error:',e);
     toast('พื้นที่ในเครื่องเต็ม — บันทึกขึ้น Cloud อย่างเดียว');
