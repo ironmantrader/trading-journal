@@ -9,6 +9,11 @@ service cloud.firestore {
     // Trading Journal — เอกสารเดียวต่อผู้ใช้ อ่าน/เขียนได้เฉพาะเจ้าของ
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      // สำเนารายวัน 7 ชุดล่าสุด — กฎของ document แม่ไม่ครอบ subcollection ต้องเขียนแยก
+      match /backups/{day} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
     }
 
     // Fitness Hub — คนละแอพ คนละ collection แต่ project เดียวกัน

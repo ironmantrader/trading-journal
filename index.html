@@ -184,6 +184,7 @@ tr:hover td{background:var(--bg-hover)}
     <button class="btn-icon" onclick="openAIExport()" style="background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;border-color:transparent;font-weight:600">&#129302; Export AI</button>
     <button class="btn-icon" onclick="exportData()">Export JSON</button>
     <button class="btn-icon" onclick="document.getElementById('importFile').click()">Import</button>
+    <button class="btn-icon" onclick="openBackups()">&#128190; สำเนา</button>
     <input type="file" id="importFile" class="hidden-input" accept=".json">
     <div id="syncStatus" class="sync-status offline" onclick="forceSync()" title="คลิกเพื่อซิงค์เดี๋ยวนี้"><span class="sync-dot"></span><span id="syncText">Offline</span></div>
     <div id="authArea"><button class="auth-btn" onclick="firebaseLogin()"><svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Login</button></div>
@@ -646,11 +647,68 @@ function subscribeCloud(uid){
   });
 }
 
+// ── สำเนาย้อนหลัง ─────────────────────────────────────────────
+// ทุกอย่างอยู่ใน document เดียว ถ้าวันหนึ่งมันเสียหรือถูกเขียนทับ ก็ไม่มีอะไรให้ย้อนกลับ
+// เก็บสำเนารายวันไว้ 7 ชุดใน subcollection แยก วันละครั้งพอ
+const BACKUP_KEEP=7;
+let backupDone=false;
+function backupsRef(){return db.collection('users').doc(currentUser.uid).collection('backups')}
+async function autoBackup(){
+  if(!currentUser||backupDone||recordCount(DB)===0)return;
+  backupDone=true;
+  try{
+    const day=today();
+    if((await backupsRef().doc(day).get()).exists)return;
+    await backupsRef().doc(day).set({tradingJournal:JSON.parse(JSON.stringify(DB)),at:firebase.firestore.FieldValue.serverTimestamp()});
+    const all=await backupsRef().get();
+    await Promise.all(all.docs.map(d=>d.id).sort().slice(0,-BACKUP_KEEP).map(id=>backupsRef().doc(id).delete()));
+  }catch(e){console.error('Backup error:',e)}
+}
+// การกู้คืนต้องชนะ tombstone ของการลบที่เพิ่งเกิด ไม่งั้นเคสที่ต้องใช้มันที่สุด — เผลอลบทิ้ง —
+// จะเป็นเคสเดียวที่มันไม่ทำอะไรเลย เพราะ mergeDB คัดรายการที่มี tombstone ใหม่กว่าออกหมด
+function restoreMerge(backup,cur){
+  const out=JSON.parse(JSON.stringify(cur)),revived=JSON.parse(JSON.stringify(backup));
+  let now=Date.now();
+  LISTS.forEach(k=>(out[k]||[]).forEach(r=>{if(r&&r.ut>=now)now=r.ut+1}));
+  Object.keys(out.deleted||{}).forEach(id=>{if(out.deleted[id]>=now)now=out.deleted[id]+1});
+  LISTS.forEach(k=>(revived[k]||[]).forEach(r=>{
+    if(!r||!r.id)return;
+    if(out.deleted&&out.deleted[r.id]!==undefined){delete out.deleted[r.id];r.ut=now}
+  }));
+  revived.deleted={};  // tombstone เก่าในสำเนาต้องไม่ย้อนกลับมาลบของที่จดหลังจากนั้น
+  return mergeDB(out,revived);
+}
+async function openBackups(){
+  if(!currentUser){toast('ต้อง Login ก่อนถึงจะมีสำเนา');return}
+  const body=document.getElementById('modalBody');
+  document.getElementById('modalTitle').textContent='สำเนาย้อนหลัง';
+  body.innerHTML='<p style="color:var(--text-muted)">กำลังโหลด...</p>';
+  document.getElementById('detailModal').classList.add('show');
+  try{
+    const all=await backupsRef().get();
+    const rows=all.docs.map(d=>({id:d.id,n:recordCount(d.data().tradingJournal||{})})).sort((a,b)=>b.id.localeCompare(a.id));
+    body.innerHTML=rows.length
+      ?'<p style="color:var(--text-muted);font-size:13px;margin-bottom:8px">รวมสำเนากลับเข้าข้อมูลปัจจุบัน — ของที่จดใหม่กว่าจะไม่ถูกทับ</p>'+
+       rows.map(r=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border-color)"><span>'+r.id+' &middot; '+r.n+' รายการ</span><button class="btn btn-secondary" onclick="restoreBackup(\''+r.id+'\')">กู้คืน</button></div>').join('')
+      :'<p style="color:var(--text-muted)">ยังไม่มีสำเนา — สำเนาแรกจะถูกเก็บอัตโนมัติเมื่อเปิดแอพครั้งต่อไป</p>';
+  }catch(e){body.innerHTML='<p style="color:var(--accent-red)">โหลดสำเนาไม่ได้: '+(e.code||e.message)+'</p>'}
+}
+async function restoreBackup(day){
+  if(!confirm('รวมสำเนาวันที่ '+day+' กลับเข้าข้อมูลปัจจุบัน?\n\nรายการที่หายไปจะถูกนำกลับมา ส่วนที่จดใหม่กว่าจะยังอยู่ครบ'))return;
+  try{
+    const d=await backupsRef().doc(day).get();
+    const b=d.exists&&d.data().tradingJournal;
+    if(!b){toast('ไม่พบสำเนาของวันนั้น');return}
+    DB=restoreMerge(b,DB);saveDB();applyCloud(DB);
+    closeModal();toast('กู้คืนจากสำเนา '+day+' แล้ว');
+  }catch(e){toast('กู้คืนไม่สำเร็จ: '+(e.code||e.message))}
+}
+
 auth.onAuthStateChanged(user=>{
   currentUser=user;
   updateAuthUI(user);
   if(cloudUnsub){cloudUnsub();cloudUnsub=null;}
-  if(user)loadFromCloud().then(()=>subscribeCloud(user.uid));
+  if(user)loadFromCloud().then(()=>{subscribeCloud(user.uid);autoBackup()});
 });
 
 // กลับมาที่แท็บ / เน็ตกลับมา คือจังหวะที่อีกเครื่องอาจแก้อะไรไปแล้ว และ listener อาจหลุดไปตอนเครื่องหลับ

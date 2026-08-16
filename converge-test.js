@@ -18,6 +18,7 @@ const pieces = [
   grab('dataSig', 'function'),
   grab('stampChanges', 'function'),
   grab('mergeDB', 'function'),
+  grab('restoreMerge', 'function'),
 ];
 const ctx = { DB: null, console };
 vm.createContext(ctx);
@@ -154,6 +155,41 @@ console.log('\n8) แก้แผน Portfolio รัว ๆ จากเคร�
   const t1 = mac.local.portfolioTs;
   mac.save(d => { d.portfolio = { capital: 3000, risk: 3 }; }); // แก้ซ้ำในมิลลิวินาทีเดียวกัน
   check('แก้ซ้ำติดกันได้ ts ที่เดินหน้าเสมอ', mac.local.portfolioTs > t1, t1 + ' -> ' + mac.local.portfolioTs);
+}
+
+console.log('\n9) กู้คืนสำเนาหลังเผลอลบทิ้ง — เคสที่ต้องใช้สำเนาจริง ๆ');
+{
+  const mac = Device('mac', 0);
+  mac.save(d => { d.trades.push({ id: 'A', d: '2026-08-10', pnl: 100 }, { id: 'B', d: '2026-08-11', pnl: 50 }); });
+  const backup = JSON.parse(JSON.stringify(mac.local));   // สำเนาของเมื่อวาน
+  mac.save(d => { d.trades.push({ id: 'C', d: '2026-08-16', pnl: 20 }); }); // จดเพิ่มวันนี้
+  mac.save(d => { d.trades = d.trades.filter(r => r.id === 'C'); });        // เผลอลบ A กับ B
+  check('ก่อนกู้: A กับ B หายไปจริง', !ids(mac.local).includes('A') && !ids(mac.local).includes('B'));
+
+  ctx.DB = mac.local;
+  const restored = ctx.restoreMerge(backup, mac.local);
+  check('กู้แล้ว A กับ B กลับมา', ids(restored).includes('A') && ids(restored).includes('B'), 'ได้ ' + ids(restored));
+  check('ของที่จดหลังสำเนา (C) ยังอยู่', ids(restored).includes('C'));
+  check('tombstone ถูกปลดแล้ว ไม่ลบซ้ำอีกรอบ', !(restored.deleted || {}).A && !(restored.deleted || {}).B);
+
+  // ต้องอยู่รอดข้ามการซิงค์รอบถัดไป ไม่ใช่กลับมาแล้วโดนอีกเครื่องลบซ้ำ
+  const cloud = { doc: JSON.parse(JSON.stringify(mac.local)) };
+  mac.local = restored;
+  mac.sync(cloud);
+  check('ซิงค์ต่อแล้วยังอยู่ ไม่โดน tombstone เก่าลบซ้ำ', ids(mac.local).includes('A') && ids(mac.local).includes('B'),
+    'ได้ ' + ids(mac.local));
+}
+
+console.log('\n10) สำเนาเก่าต้องไม่ลากของที่จดหลังจากนั้นหายไปด้วย');
+{
+  const mac = Device('mac', 0);
+  mac.save(d => { d.trades.push({ id: 'A', d: '2026-08-10' }, { id: 'X', d: '2026-08-10' }); });
+  mac.save(d => { d.trades = d.trades.filter(r => r.id !== 'X'); });  // ลบ X ทิ้งอย่างตั้งใจ
+  const backup = JSON.parse(JSON.stringify(mac.local));               // สำเนามี tombstone ของ X
+  mac.save(d => { d.trades.push({ id: 'X', d: '2026-08-16' }); });    // ภายหลังจด X ใหม่
+  ctx.DB = mac.local;
+  const restored = ctx.restoreMerge(backup, mac.local);
+  check('X ที่จดใหม่ไม่ถูก tombstone ในสำเนาลบทิ้ง', ids(restored).includes('X'), 'ได้ ' + ids(restored));
 }
 
 console.log('\n' + (fail ? 'FAILED ' + fail + ' / ' + (pass + fail) : 'ผ่านหมด ' + pass + ' ข้อ'));
