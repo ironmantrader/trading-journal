@@ -1,0 +1,11 @@
+{
+  "name": "trading-journal",
+  "private": true,
+  "scripts": {
+    "test": "node converge-test.js",
+    "test:browser": "node sdk-test.js"
+  },
+  "devDependencies": {
+    "puppeteer": "^24.0.0"
+  }
+}
