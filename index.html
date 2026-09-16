@@ -437,7 +437,6 @@ const db=firebase.firestore();
 // แอพจะขาวทั้งหน้าเพราะแคชออฟไลน์ ซึ่งไม่มีก็ยังใช้งานได้
 try{if(db.enablePersistence)db.enablePersistence({synchronizeTabs:true}).catch(()=>{})}catch(e){console.warn('persistence unavailable',e)}
 let currentUser=null;
-let syncTimeout=null;
 let cloudUnsub=null;
 let retryTimeout=null;   // ตัวจับเวลาลองเขียนใหม่
 let retryDelay=0;        // backoff ปัจจุบัน (ms)
@@ -614,16 +613,16 @@ function writeToCloud(){
     scheduleRetry();
   });
 }
+// เขียนขึ้น cloud ทันที — saveDB ถูกเรียกจากการกดปุ่มของคนเท่านั้น ไม่ใช่ทุกตัวอักษรที่พิมพ์
+// การหน่วง 1.5 วิ เคยทำให้ไม้ที่เพิ่งเซฟค้างอยู่ที่เครื่องเดิม เมื่อปิดเบราว์เซอร์ทันทีหลังกดบันทึก
 function saveToCloud(){
   if(!currentUser)return;
   pendingWrite=true;
-  if(syncTimeout)clearTimeout(syncTimeout);
-  syncTimeout=setTimeout(()=>{syncTimeout=null;writeToCloud();},1500);
+  writeToCloud();
 }
-// เขียนขึ้น cloud ทันทีที่ค้างอยู่ (ใช้ตอนกำลังปิด/สลับแท็บ กัน save ไม่ทัน)
+// ยังมีของค้างอยู่ (เขียนไม่ผ่านแล้วรอ retry) — ลองอีกทีตอนกำลังปิด/สลับแท็บ
 function flushToCloud(){
-  if(!currentUser||!syncTimeout)return;
-  clearTimeout(syncTimeout);syncTimeout=null;
+  if(!currentUser||!pendingWrite)return;
   writeToCloud();
 }
 
@@ -1301,6 +1300,11 @@ window.addEventListener('load',function(){
     else resyncOnReturn();
   });
   window.addEventListener('pagehide',flushToCloud);
+  // ปิดทั้งที่ยังขึ้น cloud ไม่สำเร็จ = ข้อมูลค้างอยู่เครื่องเดียว อีกเครื่องจะไม่เห็นเลยโดยไม่มีใครรู้
+  window.addEventListener('beforeunload',function(e){
+    if(!pendingWrite)return;
+    e.preventDefault();e.returnValue='';
+  });
 });
 </script>
 </body>
