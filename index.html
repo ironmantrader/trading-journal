@@ -589,9 +589,10 @@ function mergeDB(a,b){
 function applyCloud(cloud){
   DB=cloud;
   localStorage.setItem('ironman_trading_journal',JSON.stringify(DB));
-  document.getElementById('tradeDate').value=today();loadDayTrades();
-  document.getElementById('ptjDate').value=today();loadPTJ();
-  document.getElementById('diaryDate').value=today();loadDiary();
+  // เก็บวันที่ที่กำลังดูอยู่ไว้ — ข้อมูลใหม่จาก Cloud ไม่ใช่เหตุผลที่จะดีดคนที่เปิดวันย้อนหลัง
+  // กลับมาวันนี้กลางคัน วาดใหม่ที่วันเดิมพอ (ตอนเปิดแอพ window load ตั้ง today() ให้แล้ว)
+  ['tradeDate','ptjDate','diaryDate'].forEach(id=>{const el=document.getElementById(id);if(!el.value)el.value=today()});
+  loadDayTrades();loadPTJ();loadDiary();
   initDashYear();loadPortfolio();renderTxTable();refreshTxAuto();renderPnlTracker();loadMascot();
   // Dashboard and History are only drawn on tab entry, so a snapshot arriving
   // from another device would sit unseen behind whichever one is open.
@@ -1203,7 +1204,16 @@ function loadDiary(){const date=document.getElementById('diaryDate').value;docum
 function saveDiary(){const date=document.getElementById('diaryDate').value,text=document.getElementById('diaryText').value;if(!date)return;const i=DB.diary.findIndex(d=>d.date===date);const e={id:i>=0?DB.diary[i].id:genId(),date,text};if(i>=0)DB.diary[i]=e;else DB.diary.push(e);saveDB();toast('บันทึก Diary สำเร็จ!')}
 
 // === TAB 5: DASHBOARD ===
-function initDashYear(){const s=document.getElementById('dashYear');s.innerHTML='';for(let i=2037;i>=2025;i--)s.innerHTML+='<option value="'+i+'">'+(i+543)+'</option>';const now=new Date();s.value=now.getFullYear();document.getElementById('dashMonth').value=now.getMonth()}
+let dashInited=false;
+function initDashYear(){
+  const s=document.getElementById('dashYear'),m=document.getElementById('dashMonth');
+  // applyCloud เรียกซ้ำทุกครั้งที่ข้อมูลใหม่มาจาก Cloud — ตั้งค่าเริ่มต้นแค่รอบแรกพอ
+  // ไม่งั้นคนที่เลือกดูเดือนเก่าหรือ "ทุกเดือน" ไว้จะโดนดีดกลับเดือนปัจจุบันกลางคัน
+  if(dashInited)return;
+  s.innerHTML='';for(let i=2037;i>=2025;i--)s.innerHTML+='<option value="'+i+'">'+(i+543)+'</option>';
+  const now=new Date();s.value=now.getFullYear();m.value=now.getMonth();
+  dashInited=true;
+}
 function renderDashboard(){
   const mf=document.getElementById('dashMonth').value,yr=parseInt(document.getElementById('dashYear').value);
   const trades=DB.trades.filter(t=>{const d=new Date(t.date);return d.getFullYear()===yr&&(mf===''||d.getMonth()===parseInt(mf))});
