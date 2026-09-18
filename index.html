@@ -68,6 +68,26 @@ body{font-family:'Noto Sans Thai','Inter',sans-serif;background:var(--bg-primary
 .emotion-chip{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-secondary);font-size:13px;cursor:pointer;transition:all .2s;font-family:inherit}
 .emotion-chip:hover{border-color:var(--accent-orange)}
 .emotion-chip.selected{background:var(--accent-orange-dim);border-color:var(--accent-orange);color:var(--accent-orange)}
+.mistake-chip.selected{background:var(--accent-red-dim);border-color:var(--accent-red);color:var(--accent-red)}
+.mistake-chip.ok-chip.selected{background:rgba(14,203,129,.15);border-color:var(--accent-green);color:var(--accent-green)}
+.coach-alert{background:var(--accent-orange-dim);border:1px solid var(--accent-orange);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px}
+.coach-alert .ca-title{font-size:13px;font-weight:700;color:var(--accent-orange);margin-bottom:8px}
+.coach-alert .ca-item{font-size:13px;color:var(--text-secondary);padding:3px 0}
+.coach-alert .ca-item b{color:var(--accent-red)}
+.mk-row{display:flex;align-items:center;gap:10px;padding:6px 0}
+.mk-row .mk-name{flex:0 0 190px;font-size:13px;color:var(--text-secondary)}
+.mk-row .mk-bar{flex:1;height:10px;background:var(--bg-input);border-radius:6px;overflow:hidden}
+.mk-row .mk-bar span{display:block;height:100%;background:var(--accent-red)}
+.mk-row .mk-n{flex:0 0 60px;text-align:right;font-size:13px;font-weight:600;color:var(--accent-red)}
+.coach-note{background:var(--accent-orange-dim);border-left:3px solid var(--accent-orange);border-radius:6px;padding:8px 10px;font-size:13px;line-height:1.6}
+.shot-strip{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.shot-thumb{position:relative;width:120px;height:80px;border-radius:8px;overflow:hidden;border:1px solid var(--border);background:var(--bg-input)}
+.shot-thumb img{width:100%;height:100%;object-fit:cover;cursor:zoom-in;display:block}
+.shot-thumb .shot-del{position:absolute;top:2px;right:2px;width:20px;height:20px;border:none;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;font-size:12px;line-height:1;cursor:pointer}
+.shot-thumb .shot-wait{display:flex;align-items:center;justify-content:center;height:100%;font-size:11px;color:var(--text-muted)}
+.shot-viewer{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;cursor:zoom-out}
+.shot-viewer.show{display:flex}
+.shot-viewer img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
 .btn{padding:10px 24px;border-radius:var(--radius-sm);border:none;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;display:inline-flex;align-items:center;gap:6px}
 .btn-primary{background:linear-gradient(135deg,#f97316,#ea580c);color:#fff}
 .btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px)}
@@ -223,6 +243,7 @@ tr:hover td{background:var(--bg-hover)}
     <span class="day-label" id="dayTradeCount">ไม้ที่ 0</span>
     <span class="trade-num" id="dayTradeStats">ยังไม่มีการเทรดวันนี้</span>
   </div>
+  <div id="mistakeAlert" style="display:none"></div>
   <div class="card">
     <div class="card-title"><span class="icon">&#9889;</span> <span id="tradeFormTitle">เพิ่มไม้ใหม่</span></div>
     <div class="form-grid">
@@ -247,6 +268,16 @@ tr:hover td{background:var(--bg-hover)}
       <div class="form-group" id="winReasonGroup"><label class="form-label">ชนะเพราะว่า</label><textarea id="winReason" class="form-textarea" placeholder="วิเคราะห์สาเหตุที่ชนะ..."></textarea></div>
       <div class="form-group" id="loseReasonGroup"><label class="form-label">แพ้เพราะว่า</label><textarea id="loseReason" class="form-textarea" placeholder="วิเคราะห์สาเหตุที่แพ้..."></textarea></div>
       <div class="form-group full"><label class="form-label">อารมณ์หลังเทรด</label><textarea id="emotionAfter" class="form-textarea" placeholder="รู้สึกอย่างไรหลังจบไม้นี้..."></textarea></div>
+      <div class="form-group full" style="border-top:1px dashed var(--border);padding-top:14px;margin-top:4px"><label class="form-label"><span style="color:var(--accent-orange)">&#128221; อาจารย์ตรวจการบ้าน</span> — ข้อผิดพลาดของไม้นี้</label>
+        <div class="emotion-selector" id="mistakeTags"></div>
+        <input type="text" id="mistakeCustom" class="form-input" placeholder="ข้อผิดพลาดอื่น ๆ พิมพ์เอง (คั่นหลายข้อด้วย , )" style="margin-top:6px">
+      </div>
+      <div class="form-group full"><label class="form-label">อาจารย์บอกว่า (คำตีแนว/คำแนะนำ)</label><textarea id="coachNote" class="form-textarea" placeholder="เช่น ไม่ใช่โดจิแทรก เป็นโดจิพักตัวแล้วไปต่อ ถ้าโดจิเทา/แดงค่อยน่าสวนเทรน..."></textarea></div>
+      <div class="form-group full"><label class="form-label">รูปที่อาจารย์ตรวจกลับมา</label>
+        <div><button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('shotUpload').click()">&#128247; แนบรูปตรวจการบ้าน</button>
+        <input type="file" id="shotUpload" accept="image/*" multiple style="display:none"></div>
+        <div class="shot-strip" id="shotStrip"></div>
+      </div>
     </div>
     <div class="btn-group">
       <button class="btn btn-primary" onclick="saveTrade()" id="btnSaveTrade">&#10003; บันทึกไม้</button>
@@ -335,6 +366,7 @@ tr:hover td{background:var(--bg-hover)}
     <img id="dashMascot" class="mascot-img" style="display:none;max-height:130px" alt="">
     <div style="flex:1"><div class="stat-grid" id="statCards"></div></div>
   </div>
+  <div class="chart-container" id="mistakeRankCard"><div class="card-title"><span class="icon">&#128221;</span> ข้อผิดพลาดที่ต้องแก้ (จากการตรวจของอาจารย์)</div><div id="mistakeRank"></div></div>
   <div class="charts-row">
     <div class="chart-container"><div class="card-title">Win Rate รายเดือน</div><div class="chart-wrap"><canvas id="chartWinRate"></canvas></div></div>
     <div class="chart-container"><div class="card-title">P&L รายเดือน</div><div class="chart-wrap"><canvas id="chartPnL"></canvas></div></div>
@@ -417,6 +449,7 @@ tr:hover td{background:var(--bg-hover)}
   </div>
 </div>
 
+<div class="shot-viewer" id="shotViewer" onclick="closeShotViewer()"><img id="shotViewerImg" alt=""></div>
 <div class="modal-overlay" id="detailModal"><div class="modal"><h3 id="modalTitle"></h3><div id="modalBody"></div><div class="btn-group"><button class="btn btn-secondary" onclick="closeModal()">ปิด</button></div></div></div>
 
 <script>
@@ -948,31 +981,165 @@ function loadDayTrades(){
   document.getElementById('dayTradeCount').textContent='ไม้ที่ '+dt.length;
   document.getElementById('dayTradeStats').textContent=tot>0?'ชนะ '+w+' | แพ้ '+l+' | Win Rate '+Math.round(w/tot*100)+'%':dt.length>0?'ยังไม่มีไม้ที่เข้าเทรด':'ยังไม่มีการเทรดวันนี้';
   const tb=document.getElementById('dayTradesTable');
-  if(!dt.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:24px">ยังไม่มีบันทึกไม้</td></tr>';renderPnlTracker();return}
+  if(!dt.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:24px">ยังไม่มีบันทึกไม้</td></tr>'; renderPnlTracker();renderMistakeAlert();return}
   tb.innerHTML=dt.map(t=>{const rc=t.result==='TP'?'result-tp':t.result==='SL'?'result-sl':t.result==='BE'?'result-be':'result-none';
-  return '<tr><td>'+t.tradeNum+'</td><td>'+(t.time||'-')+'</td><td><span class="result-badge '+rc+'">'+t.result+'</span></td><td>'+(t.pair||'-')+'</td><td class="'+(t.pnl>0?'pnl-pos':t.pnl<0?'pnl-neg':'pnl-zero')+'">'+(t.pnl?((t.pnl>0?'+':'')+t.pnl.toLocaleString()+'฿'):'0฿')+'</td><td>'+(t.place||'-')+'</td><td style="max-width:150px;overflow:hidden;text-overflow:ellipsis">'+(t.emotionBefore||'-')+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">'+(t.reason||'-')+'</td><td><button class="btn btn-sm btn-secondary" onclick="viewTrade(\''+t.id+'\')" title="ดู">&#128065;</button> <button class="btn btn-sm btn-secondary" onclick="editTrade(\''+t.id+'\')" title="แก้ไข" style="color:var(--accent-orange)">&#9998;</button> <button class="btn btn-sm btn-danger" onclick="deleteTrade(\''+t.id+'\')" title="ลบ">&#10005;</button></td></tr>'}).join('');renderPnlTracker()}
+  return '<tr><td>'+t.tradeNum+'</td><td>'+(t.time||'-')+'</td><td><span class="result-badge '+rc+'">'+t.result+'</span></td><td>'+(t.pair||'-')+'</td><td class="'+(t.pnl>0?'pnl-pos':t.pnl<0?'pnl-neg':'pnl-zero')+'">'+(t.pnl?((t.pnl>0?'+':'')+t.pnl.toLocaleString()+'฿'):'0฿')+'</td><td>'+(t.place||'-')+'</td><td style="max-width:150px;overflow:hidden;text-overflow:ellipsis">'+(t.emotionBefore||'-')+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">'+(t.reason||'-')+'</td><td><button class="btn btn-sm btn-secondary" onclick="viewTrade(\''+t.id+'\')" title="ดู">&#128065;</button> <button class="btn btn-sm btn-secondary" onclick="editTrade(\''+t.id+'\')" title="แก้ไข" style="color:var(--accent-orange)">&#9998;</button> <button class="btn btn-sm btn-danger" onclick="deleteTrade(\''+t.id+'\')" title="ลบ">&#10005;</button></td></tr>'}).join('');renderPnlTracker();renderMistakeAlert()}
+
+// === รูปตรวจการบ้าน ===
+// เก็บรูปแยกเป็น doc ละรูปใน subcollection ไม่ยัดลง users/{uid} ที่ sync ทั้งก้อน
+// เพราะ doc เดียวจำกัด 1 MiB — รูปเดียวก็ทะลุแล้ว และจะลากทั้งระบบ sync ล่มไปด้วย
+const SHOT_MAX_BYTES=900*1024;
+const shotCache={};
+let formShots=[];
+function shotsRef(){return db.collection('users').doc(currentUser.uid).collection('coachShots')}
+function shrinkShot(src,cb){
+  const img=new Image();
+  img.onload=function(){
+    // ไล่ย่อลงจนกว่าจะพอดี doc เดียว — รูปมือถือแนวนอนบางรูปใหญ่เกินตั้งแต่รอบแรก
+    const tries=[[1280,0.72],[1280,0.6],[1024,0.6],[800,0.55]];
+    for(let i=0;i<tries.length;i++){
+      const max=tries[i][0],q=tries[i][1];
+      const sc=Math.min(1,max/Math.max(img.width,img.height));
+      const c=document.createElement('canvas');
+      c.width=Math.max(1,Math.round(img.width*sc));c.height=Math.max(1,Math.round(img.height*sc));
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      let url='';try{url=c.toDataURL('image/webp',q)}catch(e){}
+      if(url.indexOf('data:image/webp')!==0)url=c.toDataURL('image/jpeg',q);
+      if(url.length<=SHOT_MAX_BYTES)return cb(url);
+    }
+    cb('');
+  };
+  img.onerror=function(){cb('')};
+  img.src=src;
+}
+function attachShots(e){
+  const files=Array.from(e.target.files||[]);e.target.value='';
+  if(!files.length)return;
+  if(!currentUser){toast('ต้อง Login ก่อนถึงจะแนบรูปได้');return}
+  files.forEach(f=>{
+    const r=new FileReader();
+    r.onload=function(ev){shrinkShot(ev.target.result,function(url){
+      if(!url){toast('รูปนี้ใหญ่เกินไป ย่อแล้วยังไม่พอ');return}
+      const id=genId();shotCache[id]=url;formShots.push({id:id,isNew:true});
+      renderShotStrip();
+    })};
+    r.readAsDataURL(f);
+  });
+}
+function renderShotStrip(){
+  const el=document.getElementById('shotStrip');if(!el)return;
+  el.innerHTML=formShots.map(s=>'<div class="shot-thumb">'+(shotCache[s.id]?'<img src="'+shotCache[s.id]+'" onclick="openShotViewer(\''+s.id+'\')">':'<div class="shot-wait">กำลังโหลด...</div>')+'<button type="button" class="shot-del" onclick="removeFormShot(\''+s.id+'\')">&#10005;</button></div>').join('');
+}
+function removeFormShot(id){
+  const s=formShots.find(x=>x.id===id);
+  formShots=formShots.filter(x=>x.id!==id);
+  // รูปที่เคยขึ้น cloud แล้วต้องลบทิ้งจริง ไม่งั้นค้างกินพื้นที่โดยไม่มีไม้ไหนอ้างถึง
+  if(s&&!s.isNew&&currentUser)shotsRef().doc(id).delete().catch(e=>console.error('ลบรูปไม่สำเร็จ:',e));
+  renderShotStrip();
+}
+// ไม่ await ตรงนี้ — ตอนออฟไลน์ Firestore จะไม่ resolve จนกว่าจะต่อเน็ตได้
+// ถ้ารอ การบันทึกไม้จะค้างไปด้วย ปล่อยให้คิว offline ส่งเองเหมือนข้อมูลส่วนอื่น
+function flushFormShots(date){
+  if(!currentUser)return formShots.map(s=>s.id);
+  formShots.forEach(s=>{
+    if(!s.isNew)return;
+    shotsRef().doc(s.id).set({data:shotCache[s.id]||'',date:date||'',ts:Date.now()}).catch(e=>{console.error('อัปโหลดรูปไม่สำเร็จ:',e);toast('อัปโหลดรูปไม่สำเร็จ')});
+    s.isNew=false;
+  });
+  return formShots.map(s=>s.id);
+}
+async function loadShot(id){
+  if(shotCache[id])return shotCache[id];
+  if(!currentUser)return '';
+  try{const d=await shotsRef().doc(id).get();const u=d.exists?(d.data().data||''):'';if(u)shotCache[id]=u;return u}
+  catch(e){console.error('โหลดรูปไม่สำเร็จ:',e);return ''}
+}
+async function renderShotsInto(elId,ids){
+  const el=document.getElementById(elId);if(!el||!ids||!ids.length)return;
+  el.innerHTML=ids.map(()=>'<div class="shot-thumb"><div class="shot-wait">กำลังโหลด...</div></div>').join('');
+  const urls=await Promise.all(ids.map(loadShot));
+  el.innerHTML=ids.map((id,i)=>'<div class="shot-thumb">'+(urls[i]?'<img src="'+urls[i]+'" onclick="openShotViewer(\''+id+'\')">':'<div class="shot-wait">เปิดรูปไม่ได้</div>')+'</div>').join('');
+}
+function openShotViewer(id){
+  const u=shotCache[id];if(!u)return;
+  document.getElementById('shotViewerImg').src=u;
+  document.getElementById('shotViewer').classList.add('show');
+}
+function closeShotViewer(){document.getElementById('shotViewer').classList.remove('show')}
+async function loadFormShots(ids){
+  formShots=(ids||[]).map(id=>({id:id,isNew:false}));
+  renderShotStrip();
+  await Promise.all((ids||[]).map(loadShot));
+  renderShotStrip();
+}
+
+// === ตรวจการบ้าน (อาจารย์จ๊อบ) ===
+const MISTAKE_TAGS=['ทำถูกตามระบบ','อ่านโดจิผิด','สวนเทรน','รีบเข้า ไม่รอสัญญาณครบ','ไม่ดูแนวรับ-แนวต้าน','แนวซ้อน','เทรดแนวย่อย','เข้าผิดจังหวะ/ผิดเวลา','แก้มือ','เข้าเกินจำนวนไม้ที่วางแผน','ไม้ใหญ่เกินแผน','เทรดช่วงข่าว/ผันผวน','เดา ไม่มีสัญญาณ'];
+const OK_TAG=MISTAKE_TAGS[0];
+function renderMistakeChips(){document.getElementById('mistakeTags').innerHTML=MISTAKE_TAGS.map(t=>'<button class="emotion-chip mistake-chip'+(t===OK_TAG?' ok-chip':'')+'" data-val="'+t+'" onclick="selectEmotion(this)">'+(t===OK_TAG?'&#10003; ':'')+t+'</button>').join('')}
+function getMistakes(){
+  const picked=Array.from(document.querySelectorAll('#mistakeTags .emotion-chip.selected')).map(c=>c.dataset.val);
+  const custom=document.getElementById('mistakeCustom').value.split(',').map(x=>x.trim()).filter(Boolean);
+  return picked.concat(custom.filter(c=>picked.indexOf(c)<0));
+}
+// นับเฉพาะไม้ที่อาจารย์ตรวจแล้ว (มีแท็ก) — ไม้ที่ยังไม่ส่งตรวจไม่ควรถูกนับว่า "ไม่ผิด"
+function mistakeStats(trades){
+  const c={};let checked=0,clean=0;
+  trades.forEach(t=>{const m=t.mistakes||[];if(!m.length)return;checked++;
+    if(m.length===1&&m[0]===OK_TAG)clean++;
+    m.forEach(x=>{if(x===OK_TAG)return;c[x]=(c[x]||0)+1})});
+  return{list:Object.keys(c).map(k=>[k,c[k]]).sort((a,b)=>b[1]-a[1]),checked:checked,clean:clean};
+}
+function recentTrades(days){const f=new Date();f.setDate(f.getDate()-days);const fs=f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0')+'-'+String(f.getDate()).padStart(2,'0');return DB.trades.filter(t=>t.date>=fs)}
+// เตือนตอนกำลังจะบันทึกไม้ใหม่ — สถิติที่ไม่ได้อ่านตอนตัดสินใจ ไม่ช่วยให้เลิกพลาดซ้ำ
+function renderMistakeAlert(){
+  const el=document.getElementById('mistakeAlert');if(!el)return;
+  const st=mistakeStats(recentTrades(30));
+  if(!st.list.length){el.style.display='none';el.innerHTML='';return}
+  const top=st.list.slice(0,3);
+  el.innerHTML='<div class="ca-title">&#9888; ก่อนกดเข้าไม้ — 30 วันล่าสุดพลาดเรื่องนี้บ่อยสุด</div>'+
+    top.map((m,i)=>'<div class="ca-item">'+(i+1)+'. <b>'+m[0]+'</b> — '+m[1]+' ครั้ง</div>').join('')+
+    '<div class="ca-item" style="margin-top:6px;color:var(--text-muted);font-size:12px">อาจารย์ตรวจแล้ว '+st.checked+' ไม้ · ผ่านไม่มีที่ติ '+st.clean+' ไม้ ('+(st.checked?Math.round(st.clean/st.checked*100):0)+'%)</div>';
+  el.style.display='block';
+}
+function renderMistakeRank(trades){
+  const el=document.getElementById('mistakeRank');if(!el)return;
+  const st=mistakeStats(trades);
+  if(!st.checked){el.innerHTML='<div class="empty-state"><div class="icon">&#128221;</div><p>ยังไม่มีไม้ที่ติดแท็กผลตรวจของอาจารย์ในช่วงนี้</p></div>';return}
+  const mx=st.list.length?st.list[0][1]:1;
+  el.innerHTML='<div style="font-size:13px;color:var(--text-muted);margin-bottom:10px">ตรวจแล้ว '+st.checked+' ไม้ · ผ่านไม่มีที่ติ <b style="color:var(--accent-green)">'+st.clean+'</b> ไม้ ('+Math.round(st.clean/st.checked*100)+'%)</div>'+
+    (st.list.length?st.list.map(m=>'<div class="mk-row"><div class="mk-name">'+m[0]+'</div><div class="mk-bar"><span style="width:'+Math.round(m[1]/mx*100)+'%"></span></div><div class="mk-n">'+m[1]+' ครั้ง</div></div>').join(''):'<div style="color:var(--accent-green);font-size:13px">ไม่มีข้อผิดพลาดในช่วงนี้ &#127881;</div>');
+}
 
 function saveTrade(){
   const date=document.getElementById('tradeDate').value;if(!date){toast('กรุณาเลือกวันที่');return}
   const ce=document.getElementById('emotionBeforeCustom').value,ch=getSelectedEmotions('emotionBefore');
-  const d={place:document.getElementById('tradePlace').value,time:document.getElementById('tradeTime').value,result:document.getElementById('tradeResult').value,pair:document.getElementById('tradePair').value,pnl:parseFloat(document.getElementById('tradePnl').value)||0,emotionBefore:ce||ch||'',reason:document.getElementById('tradeReason').value,winReason:document.getElementById('winReason').value,loseReason:document.getElementById('loseReason').value,emotionAfter:document.getElementById('emotionAfter').value};
+  const d={place:document.getElementById('tradePlace').value,time:document.getElementById('tradeTime').value,result:document.getElementById('tradeResult').value,pair:document.getElementById('tradePair').value,pnl:parseFloat(document.getElementById('tradePnl').value)||0,emotionBefore:ce||ch||'',reason:document.getElementById('tradeReason').value,winReason:document.getElementById('winReason').value,loseReason:document.getElementById('loseReason').value,emotionAfter:document.getElementById('emotionAfter').value,mistakes:getMistakes(),coachNote:document.getElementById('coachNote').value,shots:flushFormShots(date)};
   if(editingTradeId){const i=DB.trades.findIndex(t=>t.id===editingTradeId);if(i>=0){Object.assign(DB.trades[i],d);DB.trades[i].updatedAt=new Date().toISOString()}saveDB();cancelEditTrade();loadDayTrades();toast('แก้ไขไม้สำเร็จ!')}
   else{const tr={id:genId(),date:date,tradeNum:DB.trades.filter(t=>t.date===date).length+1,...d,createdAt:new Date().toISOString()};DB.trades.push(tr);saveDB();clearTradeForm();loadDayTrades();toast('บันทึกไม้สำเร็จ!')}}
 
 function editTrade(id){const t=DB.trades.find(x=>x.id===id);if(!t)return;editingTradeId=id;
   document.getElementById('tradePlace').value=t.place||'';document.getElementById('tradeTime').value=t.time||'';document.getElementById('tradeResult').value=t.result||'-';document.getElementById('tradePair').value=t.pair||'';document.getElementById('tradePnl').value=t.pnl||'';document.getElementById('emotionBeforeCustom').value=t.emotionBefore||'';document.getElementById('tradeReason').value=t.reason||'';document.getElementById('winReason').value=t.winReason||'';document.getElementById('loseReason').value=t.loseReason||'';document.getElementById('emotionAfter').value=t.emotionAfter||'';
+  document.getElementById('coachNote').value=t.coachNote||'';
+  loadFormShots(t.shots);
+  const mk=t.mistakes||[];document.querySelectorAll('#mistakeTags .emotion-chip').forEach(c=>c.classList.toggle('selected',mk.indexOf(c.dataset.val)>=0));
+  document.getElementById('mistakeCustom').value=mk.filter(m=>MISTAKE_TAGS.indexOf(m)<0).join(', ');
   toggleResultFields();document.querySelectorAll('#emotionBefore .emotion-chip').forEach(c=>c.classList.toggle('selected',t.emotionBefore&&t.emotionBefore.includes(c.dataset.val)));
   document.getElementById('btnSaveTrade').innerHTML='&#9998; อัปเดตไม้';document.getElementById('btnCancelTrade').textContent='ยกเลิกแก้ไข';document.getElementById('tradeFormTitle').textContent='แก้ไขไม้ #'+t.tradeNum;
   document.querySelector('#tab-trades .card').scrollIntoView({behavior:'smooth'})}
 
 function cancelEditTrade(){editingTradeId=null;clearTradeForm();document.getElementById('btnSaveTrade').innerHTML='&#10003; บันทึกไม้';document.getElementById('btnCancelTrade').textContent='ล้างฟอร์ม';document.getElementById('tradeFormTitle').textContent='เพิ่มไม้ใหม่'}
-function clearTradeForm(){['tradePlace','tradeTime','tradePair','tradePnl','emotionBeforeCustom','tradeReason','winReason','loseReason','emotionAfter'].forEach(id=>document.getElementById(id).value='');document.getElementById('tradeResult').value='-';document.querySelectorAll('#emotionBefore .emotion-chip').forEach(c=>c.classList.remove('selected'));toggleResultFields()}
-function deleteTrade(id){if(!confirm('ลบไม้นี้?'))return;DB.trades=DB.trades.filter(t=>t.id!==id);const date=document.getElementById('tradeDate').value;DB.trades.filter(t=>t.date===date).sort((a,b)=>a.tradeNum-b.tradeNum).forEach((t,i)=>t.tradeNum=i+1);saveDB();loadDayTrades();toast('ลบสำเร็จ')}
+function clearTradeForm(){['tradePlace','tradeTime','tradePair','tradePnl','emotionBeforeCustom','tradeReason','winReason','loseReason','emotionAfter','coachNote','mistakeCustom'].forEach(id=>document.getElementById(id).value='');document.getElementById('tradeResult').value='-';document.querySelectorAll('#emotionBefore .emotion-chip,#mistakeTags .emotion-chip').forEach(c=>c.classList.remove('selected'));formShots=[];renderShotStrip();toggleResultFields()}
+function deleteTrade(id){if(!confirm('ลบไม้นี้?'))return;
+  const gone=DB.trades.find(t=>t.id===id);
+  if(gone&&gone.shots&&currentUser)gone.shots.forEach(sid=>shotsRef().doc(sid).delete().catch(e=>console.error('ลบรูปไม่สำเร็จ:',e)));
+  DB.trades=DB.trades.filter(t=>t.id!==id);const date=document.getElementById('tradeDate').value;DB.trades.filter(t=>t.date===date).sort((a,b)=>a.tradeNum-b.tradeNum).forEach((t,i)=>t.tradeNum=i+1);saveDB();loadDayTrades();toast('ลบสำเร็จ')}
 
 function viewTrade(id){const t=DB.trades.find(x=>x.id===id);if(!t)return;
   const rc=t.result==='TP'?'color:var(--accent-green)':t.result==='SL'?'color:var(--accent-red)':'';
   document.getElementById('modalTitle').textContent='ไม้ที่ '+t.tradeNum+' — '+formatDate(t.date);
-  document.getElementById('modalBody').innerHTML='<div style="display:grid;gap:10px"><div class="plan-row"><span>ผลการเทรด</span><span style="'+rc+';font-weight:700">'+t.result+'</span></div><div class="plan-row"><span>คู่เงิน</span><span>'+(t.pair||'-')+'</span></div><div class="plan-row"><span>เวลา</span><span>'+(t.time||'-')+'</span></div><div class="plan-row"><span>สถานที่</span><span>'+(t.place||'-')+'</span></div><div class="plan-row"><span>อารมณ์ก่อนเทรด</span><span>'+(t.emotionBefore||'-')+'</span></div><div style="padding:8px 0;border-bottom:1px solid var(--border)"><div class="form-label" style="margin-bottom:4px">เหตุผลการเข้าออเดอร์</div><div style="font-size:13px;line-height:1.6">'+(t.reason||'-')+'</div></div>'+(t.winReason?'<div style="padding:8px 0;border-bottom:1px solid var(--border);color:var(--accent-green)"><div class="form-label">ชนะเพราะว่า</div><div style="font-size:13px;line-height:1.6">'+t.winReason+'</div></div>':'')+(t.loseReason?'<div style="padding:8px 0;border-bottom:1px solid var(--border);color:var(--accent-red)"><div class="form-label">แพ้เพราะว่า</div><div style="font-size:13px;line-height:1.6">'+t.loseReason+'</div></div>':'')+'<div style="padding:8px 0"><div class="form-label">อารมณ์หลังเทรด</div><div style="font-size:13px;line-height:1.6">'+(t.emotionAfter||'-')+'</div></div></div>';
+  document.getElementById('modalBody').innerHTML='<div style="display:grid;gap:10px"><div class="plan-row"><span>ผลการเทรด</span><span style="'+rc+';font-weight:700">'+t.result+'</span></div><div class="plan-row"><span>คู่เงิน</span><span>'+(t.pair||'-')+'</span></div><div class="plan-row"><span>เวลา</span><span>'+(t.time||'-')+'</span></div><div class="plan-row"><span>สถานที่</span><span>'+(t.place||'-')+'</span></div><div class="plan-row"><span>อารมณ์ก่อนเทรด</span><span>'+(t.emotionBefore||'-')+'</span></div><div style="padding:8px 0;border-bottom:1px solid var(--border)"><div class="form-label" style="margin-bottom:4px">เหตุผลการเข้าออเดอร์</div><div style="font-size:13px;line-height:1.6">'+(t.reason||'-')+'</div></div>'+(t.winReason?'<div style="padding:8px 0;border-bottom:1px solid var(--border);color:var(--accent-green)"><div class="form-label">ชนะเพราะว่า</div><div style="font-size:13px;line-height:1.6">'+t.winReason+'</div></div>':'')+(t.loseReason?'<div style="padding:8px 0;border-bottom:1px solid var(--border);color:var(--accent-red)"><div class="form-label">แพ้เพราะว่า</div><div style="font-size:13px;line-height:1.6">'+t.loseReason+'</div></div>':'')+'<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div class="form-label">อารมณ์หลังเทรด</div><div style="font-size:13px;line-height:1.6">'+(t.emotionAfter||'-')+'</div></div>'+((t.mistakes&&t.mistakes.length)?'<div style="padding:8px 0"><div class="form-label">อาจารย์ตรวจการบ้าน</div><div class="emotion-selector" style="margin-top:4px">'+t.mistakes.map(m=>'<span class="emotion-chip mistake-chip selected'+(m===OK_TAG?' ok-chip':'')+'" style="cursor:default">'+m+'</span>').join('')+'</div></div>':'')+(t.coachNote?'<div style="padding:8px 0"><div class="form-label">อาจารย์บอกว่า</div><div class="coach-note">'+t.coachNote.replace(/</g,'&lt;')+'</div></div>':'')+((t.shots&&t.shots.length)?'<div style="padding:8px 0"><div class="form-label">รูปที่อาจารย์ตรวจกลับมา</div><div class="shot-strip" id="modalShots"></div></div>':'')+'</div>';
+  if(t.shots&&t.shots.length)renderShotsInto('modalShots',t.shots);
   document.getElementById('detailModal').classList.add('show')}
 function closeModal(){document.getElementById('detailModal').classList.remove('show')}
 
@@ -1052,6 +1219,7 @@ function renderDashboard(){
     <div class="stat-card"><div class="stat-label">วันเทรด</div><div class="stat-value" style="color:var(--accent-purple)">${td}</div><div class="stat-sub" style="color:var(--text-muted)">ตามระบบ ${sd} วัน</div></div>
     <div class="stat-card"><div class="stat-label">เฉลี่ย/วัน</div><div class="stat-value" style="color:var(--accent-cyan)">${td>0?(pnl/td).toFixed(0):0}</div><div class="stat-sub" style="color:var(--text-muted)">฿/วัน</div></div>
     <div class="stat-card"><div class="stat-label">Discipline</div><div class="stat-value" style="color:var(--accent-orange)">${td>0?Math.round(sd/td*100):0}%</div><div class="stat-sub" style="color:var(--text-muted)">เทรดตามระบบ</div></div>`;
+  renderMistakeRank(trades);
   renderCharts(yr,mf)}
 
 function renderCharts(yr,mf){
@@ -1171,6 +1339,11 @@ function generateAIExport(action){
   txt+='│ วันที่เทรด: '+ptjs.length+' วัน\n';
   txt+='│ เทรดตามระบบ: '+sysDays+'/'+ptjs.length+' วัน ('+(ptjs.length>0?Math.round(sysDays/ptjs.length*100):0)+'%)\n';
   txt+='│ วันที่ฝืนกดไม้: '+forcedDays+' วัน\n';
+  const mkSt=mistakeStats(trades);
+  if(mkSt.checked){
+    txt+='│ อาจารย์ตรวจแล้ว: '+mkSt.checked+' ไม้ (ผ่านไม่มีที่ติ '+mkSt.clean+' ไม้ = '+Math.round(mkSt.clean/mkSt.checked*100)+'%)\n';
+    if(mkSt.list.length)txt+='│ ข้อผิดพลาดบ่อยสุด: '+mkSt.list.slice(0,5).map(m=>m[0]+' '+m[1]+' ครั้ง').join(' | ')+'\n';
+  }
   txt+='└─────────────────────────────────────────\n\n';
 
   // === MONTHLY BREAKDOWN ===
@@ -1225,7 +1398,9 @@ function generateAIExport(action){
           if(t.reason)txt+='    เหตุผล: '+t.reason+'\n';
           if(t.winReason)txt+='    ชนะเพราะ: '+t.winReason+'\n';
           if(t.loseReason)txt+='    แพ้เพราะ: '+t.loseReason+'\n';
-          if(t.emotionAfter)txt+='    อารมณ์หลัง: '+t.emotionAfter+'\n'})}
+          if(t.emotionAfter)txt+='    อารมณ์หลัง: '+t.emotionAfter+'\n';
+          if(t.mistakes&&t.mistakes.length)txt+='    อาจารย์ตรวจ: '+t.mistakes.join(', ')+'\n';
+          if(t.coachNote)txt+='    อาจารย์บอกว่า: '+t.coachNote.replace(/\r?\n/g,' ')+'\n'})}
 
       if(incP&&ptj){
         txt+='  [วัดผลสิ้นวัน]\n';
@@ -1283,12 +1458,13 @@ window.addEventListener('load',function(){
   document.getElementById('ptjDate').value=today();loadPTJ();
   document.getElementById('txDate').value=today();refreshTxAuto();
   document.getElementById('diaryDate').value=today();loadDiary();
-  initDashYear();loadPortfolio();renderTxTable();toggleResultFields();loadMascot();renderPnlTracker();
+  initDashYear();loadPortfolio();renderTxTable();toggleResultFields();loadMascot();renderMistakeChips();renderPnlTracker();renderMistakeAlert();
   document.getElementById('historyMonth').value=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
   const now=new Date();document.getElementById('tradeTime').value=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   // Event listeners
   document.getElementById('importFile').addEventListener('change',importData);
-  document.getElementById('mascotUpload').addEventListener('change',uploadMascot);
+  document.getElementById('mascotUpload').addEventListener('change',uploadMascot);  document.getElementById('mascotUpload').addEventListener('change',uploadMascot);
+  document.getElementById('shotUpload').addEventListener('change',attachShots);
   document.getElementById('headerMascot').addEventListener('click',function(){document.getElementById('mascotUpload').click()});
   document.getElementById('headerLogoFallback').addEventListener('click',function(){document.getElementById('mascotUpload').click()});
   document.getElementById('detailModal').addEventListener('click',function(e){if(e.target===this)closeModal()});
