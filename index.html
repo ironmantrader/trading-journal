@@ -585,6 +585,38 @@ function mergeDB(a,b){
   out.mascotTs=Math.max(am,bm);
   return out;
 }
+// ช่องที่ผู้ใช้กำลังพิมพ์ค้างอยู่ (ยังไม่กดบันทึก) ต้องไม่ถูก snapshot จาก cloud เขียนทับ
+// ไม่งั้นระหว่างเขียน diary ยาว ๆ อีกเครื่องเขียนอะไรนิดเดียว ที่พิมพ์ไว้ก็หายทั้งก้อน
+const FORM_FIELDS={ptj:['ptjForced','ptjPnl','ptjGood','ptjImprove','ptjReminder'],diary:['diaryText']};
+const formDirty={};
+function watchForms(){
+  Object.keys(FORM_FIELDS).forEach(f=>FORM_FIELDS[f].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    ['input','change'].forEach(ev=>el.addEventListener(ev,()=>{formDirty[f]=true}));
+  }));
+  document.querySelectorAll('#ptjSystemEmo .emotion-chip').forEach(c=>c.addEventListener('click',()=>{formDirty.ptj=true}));
+  const ta=document.getElementById('diaryText');
+  if(ta)ta.addEventListener('input',()=>{clearTimeout(draftTimeout);draftTimeout=setTimeout(saveDiaryDraft,600)});
+}
+// diary ยาว ๆ ถูกเขียนเป็นนาที แต่จะขึ้นเครื่องก็ต่อเมื่อกดบันทึก
+// ปิดแท็บ รีเฟรช หรือเบราว์เซอร์ล้มก่อนหน้านั้น ที่เขียนไว้ก็ไม่เหลืออะไรเลย
+// ร่างจึงเก็บแยกจากข้อมูลจริง ไม่ปนขึ้น cloud และไม่ชน tombstone
+const DRAFT_KEY='ironman_diary_draft';
+let draftTimeout=null;
+function readDrafts(){try{return JSON.parse(localStorage.getItem(DRAFT_KEY)||'{}')}catch(e){return {}}}
+function writeDrafts(d){try{localStorage.setItem(DRAFT_KEY,JSON.stringify(d))}catch(e){console.error('Draft save error:',e)}}
+function saveDiaryDraft(){
+  draftTimeout=null;
+  const date=document.getElementById('diaryDate').value;if(!date)return;
+  const text=document.getElementById('diaryText').value;
+  const saved=((DB.diary||[]).find(d=>d.date===date)||{}).text||'';
+  const drafts=readDrafts();
+  if(text===saved)delete drafts[date];else drafts[date]=text;   // ตรงกับที่บันทึกแล้ว = ไม่ใช่ร่างอีกต่อไป
+  writeDrafts(drafts);
+}
+function flushDiaryDraft(){if(draftTimeout){clearTimeout(draftTimeout);saveDiaryDraft()}}
+function clearDiaryDraft(date){const d=readDrafts();if(d[date]===undefined)return;delete d[date];writeDrafts(d)}
+
 // นำข้อมูลจาก cloud มาใช้ทั้งก้อน แล้ว refresh ทุกหน้า
 function applyCloud(cloud){
   DB=cloud;
@@ -592,13 +624,16 @@ function applyCloud(cloud){
   // เก็บวันที่ที่กำลังดูอยู่ไว้ — ข้อมูลใหม่จาก Cloud ไม่ใช่เหตุผลที่จะดีดคนที่เปิดวันย้อนหลัง
   // กลับมาวันนี้กลางคัน วาดใหม่ที่วันเดิมพอ (ตอนเปิดแอพ window load ตั้ง today() ให้แล้ว)
   ['tradeDate','ptjDate','diaryDate'].forEach(id=>{const el=document.getElementById(id);if(!el.value)el.value=today()});
-  loadDayTrades();loadPTJ();loadDiary();
+  loadDayTrades();
+  if(!formDirty.ptj)loadPTJ();
+  if(!formDirty.diary)loadDiary();
   initDashYear();loadPortfolio();renderTxTable();refreshTxAuto();renderPnlTracker();loadMascot();
   // Dashboard and History are only drawn on tab entry, so a snapshot arriving
   // from another device would sit unseen behind whichever one is open.
   const act=document.querySelector('.tab-content.active');
   if(act&&act.id==='tab-dashboard')renderDashboard();
   if(act&&act.id==='tab-history')renderHistory();
+  if(formDirty.ptj||formDirty.diary)toast('มีข้อมูลใหม่จาก Cloud — ที่กำลังพิมพ์ยังอยู่ กดบันทึกได้เลย');
 }
 async function loadFromCloud(){
   if(!currentUser)return;
@@ -1161,7 +1196,7 @@ function refreshPTJAuto(){const date=document.getElementById('ptjDate').value;
   if(el.value!==''&&el.value!==String(ptjAutoPnl))return;
   ptjAutoPnl=dt.length?dt.reduce((s,t)=>s+(t.pnl||0),0):null;
   el.value=ptjAutoPnl===null?'':ptjAutoPnl}
-function loadPTJ(){const date=document.getElementById('ptjDate').value;document.getElementById('ptjDayLabel').textContent=formatDate(date);
+function loadPTJ(){formDirty.ptj=false;const date=document.getElementById('ptjDate').value;document.getElementById('ptjDayLabel').textContent=formatDate(date);
   const p=DB.postTrade.find(x=>x.date===date);
   if(p){document.getElementById('ptjForced').value=p.forced||'ไม่มี';document.getElementById('ptjPnl').value=p.pnl||'';document.getElementById('ptjGood').value=p.good||'';document.getElementById('ptjImprove').value=p.improve||'';document.getElementById('ptjReminder').value=p.reminder||'';document.querySelectorAll('#ptjSystemEmo .emotion-chip').forEach(c=>c.classList.toggle('selected',c.dataset.val===p.systemOrEmotion))}
   else{['ptjPnl','ptjGood','ptjImprove','ptjReminder'].forEach(id=>document.getElementById(id).value='');document.getElementById('ptjForced').value='ไม่มี';document.querySelectorAll('#ptjSystemEmo .emotion-chip').forEach(c=>c.classList.remove('selected'))}
@@ -1169,7 +1204,7 @@ function loadPTJ(){const date=document.getElementById('ptjDate').value;document.
 function savePTJ(){const date=document.getElementById('ptjDate').value;if(!date)return;
   const idx=DB.postTrade.findIndex(p=>p.date===date);
   const p={id:idx>=0?DB.postTrade[idx].id:genId(),date,winrate:document.getElementById('ptjWinrate').value,forced:document.getElementById('ptjForced').value,systemOrEmotion:getSelectedEmotions('ptjSystemEmo'),pnl:parseFloat(document.getElementById('ptjPnl').value)||0,good:document.getElementById('ptjGood').value,improve:document.getElementById('ptjImprove').value,reminder:document.getElementById('ptjReminder').value};
-  if(idx>=0)DB.postTrade[idx]=p;else DB.postTrade.push(p);saveDB();toast('บันทึกวัดผลสิ้นวันสำเร็จ!')}
+  if(idx>=0)DB.postTrade[idx]=p;else DB.postTrade.push(p);saveDB();formDirty.ptj=false;toast('บันทึกวัดผลสิ้นวันสำเร็จ!')}
 
 // === TAB 3: TRADELOG ===
 // A 'เทรด' transaction is just the day's trades added up, so offer the number
@@ -1200,8 +1235,10 @@ function deleteTx(id){if(!confirm('ลบธุรกรรมนี้?'))retur
 
 // === TAB 4: DIARY ===
 function changeDiaryDate(d){const inp=document.getElementById('diaryDate');const dt=new Date(inp.value);dt.setDate(dt.getDate()+d);inp.value=dt.toISOString().slice(0,10);loadDiary()}
-function loadDiary(){const date=document.getElementById('diaryDate').value;document.getElementById('diaryDayLabel').textContent=formatDate(date);const e=DB.diary.find(d=>d.date===date);document.getElementById('diaryText').value=e?e.text:''}
-function saveDiary(){const date=document.getElementById('diaryDate').value,text=document.getElementById('diaryText').value;if(!date)return;const i=DB.diary.findIndex(d=>d.date===date);const e={id:i>=0?DB.diary[i].id:genId(),date,text};if(i>=0)DB.diary[i]=e;else DB.diary.push(e);saveDB();toast('บันทึก Diary สำเร็จ!')}
+function loadDiary(){formDirty.diary=false;const date=document.getElementById('diaryDate').value;document.getElementById('diaryDayLabel').textContent=formatDate(date);const e=DB.diary.find(d=>d.date===date);const ta=document.getElementById('diaryText');ta.value=e?e.text:'';
+  const dr=readDrafts()[date];
+  if(dr!==undefined&&dr!==ta.value){ta.value=dr;formDirty.diary=true;toast('กู้ร่างที่ยังไม่ได้บันทึกกลับมาแล้ว')}}
+function saveDiary(){const date=document.getElementById('diaryDate').value,text=document.getElementById('diaryText').value;if(!date)return;const i=DB.diary.findIndex(d=>d.date===date);const e={id:i>=0?DB.diary[i].id:genId(),date,text};if(i>=0)DB.diary[i]=e;else DB.diary.push(e);saveDB();formDirty.diary=false;clearDiaryDraft(date);toast('บันทึก Diary สำเร็จ!')}
 
 // === TAB 5: DASHBOARD ===
 let dashInited=false;
@@ -1472,6 +1509,7 @@ window.addEventListener('load',function(){
   document.getElementById('historyMonth').value=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
   const now=new Date();document.getElementById('tradeTime').value=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   // Event listeners
+  watchForms();
   document.getElementById('importFile').addEventListener('change',importData);
   document.getElementById('mascotUpload').addEventListener('change',uploadMascot);  document.getElementById('mascotUpload').addEventListener('change',uploadMascot);
   document.getElementById('shotUpload').addEventListener('change',attachShots);
@@ -1482,10 +1520,10 @@ window.addEventListener('load',function(){
   ['aiMonth','aiRangeFrom','aiRangeTo','aiYear'].forEach(id=>{document.getElementById(id).addEventListener('change',previewAIStats)});
   // บังคับ save ขึ้น cloud ก่อนปิด/สลับแท็บ กันข้อมูลค้างไม่ทันขึ้น
   document.addEventListener('visibilitychange',function(){
-    if(document.visibilityState==='hidden')flushToCloud();
+    if(document.visibilityState==='hidden'){flushDiaryDraft();flushToCloud()}
     else resyncOnReturn();
   });
-  window.addEventListener('pagehide',flushToCloud);
+  window.addEventListener('pagehide',function(){flushDiaryDraft();flushToCloud()});
   // ปิดทั้งที่ยังขึ้น cloud ไม่สำเร็จ = ข้อมูลค้างอยู่เครื่องเดียว อีกเครื่องจะไม่เห็นเลยโดยไม่มีใครรู้
   window.addEventListener('beforeunload',function(e){
     if(!pendingWrite)return;
