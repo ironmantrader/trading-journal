@@ -15,6 +15,7 @@ const pieces = [
   /^const LISTS=.*$/m.exec(src)[0],
   grab('recordCount', 'function'),
   grab('recSig', 'function'),
+  grab('mapSig', 'function'),
   grab('dataSig', 'function'),
   grab('stampChanges', 'function'),
   grab('mergeDB', 'function'),
@@ -228,7 +229,7 @@ function writer(server) {
     'function setSyncStatus(){}', 'function scheduleRetry(){}', 'function syncErrText(e){return String(e)}',
     'function applyCloud(c){DB=c}',
     /^const LISTS=.*$/m.exec(src)[0],
-    grab('recSig', 'function'), grab('dataSig', 'function'), grab('mergeDB', 'function'),
+    grab('recSig', 'function'), grab('mapSig', 'function'), grab('dataSig', 'function'), grab('mergeDB', 'function'),
     grab('writeToCloud', 'function'),
     'globalThis.isPending=()=>pendingWrite;',
   ].join('\n')).runInContext(w);
@@ -258,6 +259,23 @@ function writer(server) {
     mac.DB = { trades: [{ id: 'A', ut: 1 }], postTrade: [], tradelog: [], diary: [], portfolio: {}, deleted: {}, updatedAt: 1 };
     await mac.writeToCloud();
     check('cloud ได้ A', server.doc && JSON.stringify(ids(server.doc.tradingJournal)) === '["A"]');
+  }
+
+  console.log('\n13) Firestore ส่ง map กลับมาโดยเรียงคีย์ตามตัวอักษร — ข้อมูลเดิมต้องไม่ถูกนับว่า "มีของใหม่"');
+  {
+    // savePortfolio() สร้างคีย์ตามลำดับนี้ ส่วน Firestore คืนมาแบบเรียง a→z
+    const portfolio = { capital: 1000, risk: 1, sl: 2, tp: 4, dayTP: 3, daySL: 2, maxTrades: 3, maxMinutes: 60, withdraw: 0, compound: 50 };
+    const deleted = { zz1: 9, aa2: 8 };
+    const sortKeys = o => Object.fromEntries(Object.keys(o).sort().map(k => [k, o[k]]));
+    const local = { trades: [{ id: 'A', ut: 3 }], postTrade: [], tradelog: [], diary: [], portfolio, portfolioTs: 5, deleted, updatedAt: 9 };
+    const fromCloud = JSON.parse(JSON.stringify(local));
+    fromCloud.portfolio = sortKeys(portfolio); fromCloud.deleted = sortKeys(deleted);
+    check('ลายเซ็นเท่ากันแม้ลำดับคีย์ต่างกัน', ctx.dataSig(local) === ctx.dataSig(fromCloud));
+    const cloud = { doc: fromCloud };
+    const mac = Device('mac', 0); mac.local = local;
+    const before = cloud.doc;
+    mac.sync(cloud);
+    check('เปิดแอพ/กลับมาที่แท็บ แล้วไม่เขียนขึ้น cloud ซ้ำทั้งที่ไม่มีอะไรเปลี่ยน', cloud.doc === before);
   }
 
   console.log('\n' + (fail ? 'FAILED ' + fail + ' / ' + (pass + fail) : 'ผ่านหมด ' + pass + ' ข้อ'));

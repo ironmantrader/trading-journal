@@ -537,7 +537,10 @@ function recordCount(o){return LISTS.reduce((n,k)=>n+(o[k]||[]).length,0)}
 // ลายเซ็นของรายการหนึ่ง ๆ ไม่นับ ut — ใช้ดูว่าเนื้อหาเปลี่ยนจริงไหม
 function recSig(r){return JSON.stringify(Object.keys(r).filter(k=>k!=='ut').sort().map(k=>[k,r[k]]))}
 // mascot เทียบด้วย ts ไม่ใช่ตัว base64 — ลายเซ็นนี้ถูกคำนวณทุกครั้งที่ snapshot เข้ามา
-function dataSig(o){return JSON.stringify([LISTS.map(k=>(o[k]||[]).map(r=>r.id+'|'+(r.ut||0)+'|'+recSig(r)).sort()),o.portfolio||{},o.deleted||{},o.mascotTs||0])}
+// portfolio/deleted ต้องเรียงคีย์ก่อนเทียบ — Firestore คืน map มาแบบเรียง a→z ไม่ใช่ลำดับที่เราสร้าง
+// ไม่งั้นข้อมูลชุดเดิมดูเหมือน "มีของใหม่" ทุกรอบ แล้วเขียนขึ้น cloud ซ้ำทุกครั้งที่กลับมาที่แท็บ
+function mapSig(m){m=m||{};return Object.keys(m).sort().map(k=>[k,m[k]])}
+function dataSig(o){return JSON.stringify([LISTS.map(k=>(o[k]||[]).map(r=>r.id+'|'+(r.ut||0)+'|'+recSig(r)).sort()),mapSig(o.portfolio),mapSig(o.deleted),o.mascotTs||0])}
 // เทียบ DB ปัจจุบันกับที่เซฟไว้ครั้งก่อน แล้วประทับ ut เฉพาะรายการที่เปลี่ยน + จดรายการที่หายไปเป็น tombstone
 function stampChanges(prev){
   // ต้องมากกว่าทุก ut ที่เคยเห็น (รวมของอีกเครื่องที่ merge เข้ามา) — กันนาฬิกาสองเครื่องเดินไม่ตรงกันแล้วแก้ทีหลังกลับแพ้
@@ -635,9 +638,11 @@ function applyCloud(cloud){
   if(act&&act.id==='tab-history')renderHistory();
   if(formDirty.ptj||formDirty.diary)toast('มีข้อมูลใหม่จาก Cloud — ที่กำลังพิมพ์ยังอยู่ กดบันทึกได้เลย');
 }
-async function loadFromCloud(){
+// quiet = เช็คเบื้องหลังตอนกลับมาที่แท็บ — สลับหน้าต่างไปกราฟแล้วกลับมาวันละหลายสิบรอบ
+// ป้าย "กำลังโหลด..." กะพริบทุกรอบทั้งที่ส่วนใหญ่ไม่มีอะไรเปลี่ยน ถ้ามีของต้องเขียนจริง writeToCloud ขึ้นป้ายเอง
+async function loadFromCloud(quiet){
   if(!currentUser)return;
-  setSyncStatus('syncing','กำลังโหลด...');
+  if(!quiet)setSyncStatus('syncing','กำลังโหลด...');
   try{
     const doc=await db.collection('users').doc(currentUser.uid).get();
     const local=JSON.parse(localStorage.getItem('ironman_trading_journal')||'{}');
@@ -802,7 +807,7 @@ auth.onAuthStateChanged(user=>{
 function resyncOnReturn(){
   if(!currentUser)return;
   if(!cloudUnsub)subscribeCloud(currentUser.uid);
-  loadFromCloud().then(()=>{if(pendingWrite)writeToCloud()});
+  loadFromCloud(true).then(()=>{if(pendingWrite)writeToCloud()});
 }
 window.addEventListener('online',resyncOnReturn);
 
