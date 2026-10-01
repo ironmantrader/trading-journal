@@ -192,5 +192,74 @@ console.log('\n10) สำเนาเก่าต้องไม่ลากข�
   check('X ที่จดใหม่ไม่ถูก tombstone ในสำเนาลบทิ้ง', ids(restored).includes('X'), 'ได้ ' + ids(restored));
 }
 
-console.log('\n' + (fail ? 'FAILED ' + fail + ' / ' + (pass + fail) : 'ผ่านหมด ' + pass + ' ข้อ'));
-process.exit(fail ? 1 : 0);
+// Firestore จำลองพอให้ writeToCloud() ตัวจริงรันได้ — set แบบ merge:true รวม map ลึกลงไป แต่ array ถูกแทนทั้งอัน
+// เหมือนของจริง ซึ่งคือเหตุที่การเขียนทั้งก้อนลบรายการของอีกเครื่องทิ้งได้
+function fakeDb(server) {
+  const deepMerge = (t, s) => {
+    Object.keys(s).forEach(k => {
+      const v = s[k], o = t[k];
+      if (v && typeof v === 'object' && !Array.isArray(v) && o && typeof o === 'object' && !Array.isArray(o)) deepMerge(o, v);
+      else t[k] = v;
+    });
+    return t;
+  };
+  const write = (data, opts) => {
+    const d = JSON.parse(JSON.stringify(data));
+    server.doc = opts && opts.merge ? deepMerge(server.doc || {}, d) : d;
+  };
+  const snap = () => ({ exists: !!server.doc, data: () => JSON.parse(JSON.stringify(server.doc)) });
+  const ref = { set: (d, o) => { write(d, o); return Promise.resolve(); }, get: () => Promise.resolve(snap()) };
+  return {
+    collection: () => ({ doc: () => ref }),
+    runTransaction: async fn => {
+      const ops = [];
+      const r = await fn({ get: () => Promise.resolve(snap()), set: (_ref, d, o) => { ops.push([d, o]); } });
+      ops.forEach(([d, o]) => write(d, o));
+      return r;
+    },
+  };
+}
+function writer(server) {
+  const w = { DB: null, console, currentUser: { uid: 'u1', email: 'me@x' }, db: fakeDb(server),
+    firebase: { firestore: { FieldValue: { serverTimestamp: () => 'TS' } } } };
+  vm.createContext(w);
+  new vm.Script([
+    'let retryTimeout=null,retryDelay=0,pendingWrite=false;',
+    'function setSyncStatus(){}', 'function scheduleRetry(){}', 'function syncErrText(e){return String(e)}',
+    'function applyCloud(c){DB=c}',
+    /^const LISTS=.*$/m.exec(src)[0],
+    grab('recSig', 'function'), grab('dataSig', 'function'), grab('mergeDB', 'function'),
+    grab('writeToCloud', 'function'),
+    'globalThis.isPending=()=>pendingWrite;',
+  ].join('\n')).runInContext(w);
+  return w;
+}
+
+(async () => {
+  console.log('\n11) อีกเครื่องเพิ่งเขียนขึ้นไปตอนเครื่องนี้ยังไม่เห็น — กดบันทึกแล้วต้องไม่ลบของเขาทิ้งจาก cloud');
+  {
+    const server = { doc: {
+      tradingJournal: { trades: [{ id: 'B', pnl: -50, ut: 5 }], postTrade: [], tradelog: [], diary: [], portfolio: {}, deleted: {}, updatedAt: 5 },
+      goldJournal: { trades: [{ id: 'G' }] } } };
+    const mac = writer(server);
+    mac.DB = { trades: [{ id: 'A', pnl: 100, ut: 6 }], postTrade: [], tradelog: [], diary: [], portfolio: {}, deleted: {}, updatedAt: 6 };
+    await mac.writeToCloud();
+    const cloud = server.doc.tradingJournal;
+    check('cloud ยังมี B ของอีกเครื่อง และได้ A ของเครื่องนี้', JSON.stringify(ids(cloud)) === JSON.stringify(['A', 'B']), 'cloud=' + ids(cloud));
+    check('เครื่องนี้ได้ B มาด้วย ไม่ต้องรอ snapshot', JSON.stringify(ids(mac.DB)) === JSON.stringify(['A', 'B']), 'local=' + ids(mac.DB));
+    check('ไม่แตะข้อมูลของ gold-journal ที่อยู่ document เดียวกัน', server.doc.goldJournal && server.doc.goldJournal.trades[0].id === 'G');
+    check('ไม่มีของค้างหลังเขียนผ่าน', !mac.isPending());
+  }
+
+  console.log('\n12) cloud ยังว่างเปล่า (เครื่องแรกที่ Login) ต้องเขียนขึ้นได้ตามปกติ');
+  {
+    const server = { doc: null };
+    const mac = writer(server);
+    mac.DB = { trades: [{ id: 'A', ut: 1 }], postTrade: [], tradelog: [], diary: [], portfolio: {}, deleted: {}, updatedAt: 1 };
+    await mac.writeToCloud();
+    check('cloud ได้ A', server.doc && JSON.stringify(ids(server.doc.tradingJournal)) === '["A"]');
+  }
+
+  console.log('\n' + (fail ? 'FAILED ' + fail + ' / ' + (pass + fail) : 'ผ่านหมด ' + pass + ' ข้อ'));
+  process.exit(fail ? 1 : 0);
+})();

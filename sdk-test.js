@@ -33,6 +33,8 @@ async function run(ref, label) {
     authReady: typeof auth !== 'undefined' && typeof auth.onAuthStateChanged === 'function',
     dbReady: typeof db !== 'undefined' && typeof db.collection === 'function',
     persistence: typeof db !== 'undefined' && typeof db.enablePersistence === 'function',
+    // writeToCloud รวมกับ cloud ใน transaction — ถ้า SDK ไม่มี ทุกการบันทึกจะไม่ขึ้น cloud เลย
+    transaction: typeof db !== 'undefined' && typeof db.runTransaction === 'function',
     serverTs: !!(window.firebase && firebase.firestore && firebase.firestore.FieldValue &&
       typeof firebase.firestore.FieldValue.serverTimestamp === 'function'),
     provider: !!(window.firebase && firebase.auth && typeof firebase.auth.GoogleAuthProvider === 'function'),
@@ -62,13 +64,14 @@ async function run(ref, label) {
     console.log('  firestore พร้อม         ' + (r.probe.dbReady ? 'ok' : 'FAIL'));
     console.log('  enablePersistence      ' + (r.probe.persistence ? 'ยังมี' : 'ไม่มีแล้ว (guard ทำงาน)'));
     console.log('  serverTimestamp        ' + (r.probe.serverTs ? 'ok' : 'FAIL'));
+    console.log('  runTransaction         ' + (r.probe.transaction ? 'ok' : 'FAIL'));
     console.log('  GoogleAuthProvider     ' + (r.probe.provider ? 'ok' : 'FAIL'));
     console.log('  ฟังก์ชันที่หายไป          ' + (r.probe.fns.length ? r.probe.fns.join(', ') : 'ไม่มี — สคริปต์รันจบ'));
     console.log('  ป้ายสถานะ               ' + JSON.stringify(r.probe.badge));
     console.log('  แท็บที่วาดได้            ' + r.probe.tabs);
     if (r.errors.length) { console.log('  ERROR:'); r.errors.forEach(e => console.log('    ' + e)); }
     else console.log('  ไม่มี error');
-    const ok = r.probe.appReady && r.probe.authReady && r.probe.dbReady && r.probe.serverTs &&
+    const ok = r.probe.appReady && r.probe.authReady && r.probe.dbReady && r.probe.serverTs && r.probe.transaction &&
       r.probe.provider && !r.probe.fns.length && !r.errors.length && r.probe.tabs > 0;
     if (!ok) bad++;
     console.log('  ผล                     ' + (ok ? 'ผ่าน' : 'ไม่ผ่าน'));

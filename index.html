@@ -664,14 +664,28 @@ async function loadFromCloud(){
   }
 }
 
+// อ่าน cloud มารวมก่อนเขียนเสมอ ใน transaction เดียว — array ใน Firestore ถูกแทนทั้งอันแม้ใช้ merge:true
+// การเขียน DB ของเครื่องนี้ขึ้นไปตรง ๆ จึงลบรายการที่อีกเครื่องเพิ่งเขียนแต่เครื่องนี้ยังไม่เห็นทิ้งจาก cloud
+// (snapshot ยังมาไม่ถึง / ถูกข้ามเพราะมี pending write / เพิ่งกลับมาออนไลน์) แล้วอีกเครื่องจะไม่เห็นจนกว่าเครื่องที่จดจะเปิดอีกรอบ
 function writeToCloud(){
   if(!currentUser)return Promise.resolve();
   setSyncStatus('syncing','Syncing...');
-  return db.collection('users').doc(currentUser.uid).set({
-    tradingJournal:JSON.parse(JSON.stringify(DB)),
-    lastSync:firebase.firestore.FieldValue.serverTimestamp(),
-    email:currentUser.email
-  },{merge:true}).then(()=>{
+  const ref=db.collection('users').doc(currentUser.uid);
+  let merged=null;
+  return db.runTransaction(tx=>tx.get(ref).then(snap=>{
+    const cloud=snap.exists&&snap.data().tradingJournal;
+    merged=cloud?mergeDB(cloud,DB):JSON.parse(JSON.stringify(DB));
+    merged.updatedAt=Math.max((cloud&&cloud.updatedAt)||0,DB.updatedAt||0);
+    tx.set(ref,{
+      tradingJournal:JSON.parse(JSON.stringify(merged)),
+      lastSync:firebase.firestore.FieldValue.serverTimestamp(),
+      email:currentUser.email
+    },{merge:true});
+  })).then(()=>{
+    // ได้ของจากอีกเครื่องมาระหว่างรวม — DB อาจถูกแก้ต่อระหว่างรอ จึงรวมกับ DB ล่าสุดอีกที ไม่ทับด้วย merged ตรง ๆ
+    const fresh=mergeDB(merged,DB);
+    fresh.updatedAt=Math.max(merged.updatedAt||0,DB.updatedAt||0);
+    if(dataSig(fresh)!==dataSig(DB))applyCloud(fresh);
     pendingWrite=false;retryDelay=0;
     if(retryTimeout){clearTimeout(retryTimeout);retryTimeout=null}
     setSyncStatus('online','Cloud Sync');
